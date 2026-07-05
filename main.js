@@ -211,7 +211,7 @@
       }).then(function (data) {
         if (data && data.success === false) throw new Error('rejected');
         reqForm.hidden = true;
-        reqSay('DONE. A CONFIRMATION MESSAGE IS ON ITS WAY TO YOUR INBOX. CONFIRM IT AND THE DOWNLOAD LINK FOLLOWS. IF NOTHING ARRIVES, CHECK THE SPAM FOLDER.', true);
+        reqSay('DONE. THE DOWNLOAD LINK IS ON ITS WAY TO YOUR INBOX. IF NOTHING ARRIVES WITHIN A MINUTE OR TWO, CHECK THE SPAM FOLDER.', true);
       }).catch(function () {
         reqSay('SOMETHING WENT WRONG SENDING THE REQUEST. PLEASE TRY AGAIN IN A MINUTE.');
         btn.disabled = false;
