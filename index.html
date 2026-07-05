@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casrion. A background note capture utility for Windows.</title>
+  <meta name="description" content="Casrion is a quiet Windows utility that turns anything you copy into clean Markdown notes. Hotkeys, voice memos, source stamps. Fully offline, free.">
+  <link rel="icon" type="image/png" href="./favicon-32.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <!-- Fixed print furniture -->
+  <div class="crops" aria-hidden="true"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i></div>
+  <div class="margin-note margin-left" aria-hidden="true">CASRION &middot; FIELD MANUAL &middot; 2026</div>
+  <div class="margin-note margin-right" aria-hidden="true">DOC. 001 &middot; WINDOWS BUILD</div>
+
+  <div class="sheet">
+
+    <!-- ================= MASTHEAD ================= -->
+    <header class="masthead">
+      <div class="mast-row">
+        <span class="mast-cell mono">DOC. NO. 001</span>
+        <span class="mast-brand">
+          <img src="./logo-64.png" alt="" width="26" height="26">
+          <span class="mast-name">CASRION</span>
+        </span>
+        <span class="mast-cell mono right">WINDOWS 10 / 11</span>
+      </div>
+      <div class="rule-double"></div>
+      <div class="mast-sub mono">
+        <span>A BACKGROUND NOTE CAPTURE UTILITY</span>
+        <nav class="mast-nav">
+          <a href="#contents">CONTENTS</a>
+          <a href="#download">GET CASRION</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="kicker mono reveal">FIELD MANUAL &middot; FOR PEOPLE WHO READ MORE THAN THEY FILE</p>
+          <h1 class="reveal d1">It writes the note.<br>You keep reading.</h1>
+          <p class="lede reveal d2">
+            Casrion sits in the system tray and listens for a handful of hotkeys.
+            Copy a passage, press one, and it is already a Markdown note, formatted,
+            dated, and stamped with where it came from. You never switch windows.
+          </p>
+          <div class="hero-actions reveal d3">
+            <a class="btn-stamp" href="#download">[ GET CASRION FOR WINDOWS ]</a>
+            <span class="hero-meta mono">v1.0.0 &middot; free &middot; about 100 MB &middot; no account</span>
+          </div>
+        </div>
+
+        <figure class="frontis reveal d2">
+          <div class="frontis-frame" data-plx="18">
+            <img src="./art/hero.jpg" alt="Sepia field study of a mountain, with a captured note pinned over it" width="1536" height="1024">
+            <div class="frontis-note note-reveal" aria-hidden="true">
+              <div class="fn-head mono"><span>Reading_Notes.md</span><span class="fn-key">CTRL+SHIFT+C</span></div>
+              <p class="fn-line" data-text="You come to know a mountain one long look at a time."><span id="fn-typed"></span><span class="fn-cursor" id="fn-cursor"></span></p>
+              <p class="fn-src mono" id="fn-src">Source: The Living Mountain &middot; 9:41 pm</p>
+            </div>
+          </div>
+          <figcaption class="fig mono">Frontispiece &middot; You kept reading. The note kept itself.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= EDITIONS ================= -->
+    <section class="editions">
+      <div class="ed-grid">
+        <a class="ed-card reveal" style="--i:0" href="#download">
+          <span class="ed-art" style="background-image:url('./art/ed-windows.jpg')" aria-hidden="true"></span>
+          <span class="ed-eyebrow mono">WINDOWS 10 / 11</span>
+          <span class="ed-name">Windows</span>
+          <span class="ed-btn mono">AVAILABLE NOW</span>
+        </a>
+        <div class="ed-card ed-soon reveal" style="--i:1">
+          <span class="ed-art" style="background-image:url('./art/ed-mac.jpg')" aria-hidden="true"></span>
+          <span class="ed-eyebrow mono">MACOS</span>
+          <span class="ed-name">Mac</span>
+          <span class="ed-btn mono ghost">PLANNED</span>
+        </div>
+        <div class="ed-card ed-soon reveal" style="--i:2">
+          <span class="ed-art ed-art-right" style="background-image:url('./art/ed-linux.jpg')" aria-hidden="true"></span>
+          <span class="ed-eyebrow mono">LINUX</span>
+          <span class="ed-name">Linux</span>
+          <span class="ed-btn mono ghost">PLANNED</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= CONTENTS ================= -->
+    <section class="section" id="contents">
+      <header class="sec-head">
+        <span class="sec-index mono">&sect;00</span>
+        <h2>Contents</h2>
+      </header>
+      <ol class="toc">
+        <li class="reveal" style="--i:0"><a href="#procedure"><span class="toc-num mono">01</span><span class="toc-title">Procedure</span><span class="leader"></span><span class="toc-ref mono">/procedure</span></a></li>
+        <li class="reveal" style="--i:1"><a href="#instruments"><span class="toc-num mono">02</span><span class="toc-title">Instruments</span><span class="leader"></span><span class="toc-ref mono">/instruments</span></a></li>
+        <li class="reveal" style="--i:2"><a href="#demonstration"><span class="toc-num mono">03</span><span class="toc-title">Demonstration</span><span class="leader"></span><span class="toc-ref mono">/demonstration</span></a></li>
+        <li class="reveal" style="--i:3"><a href="#provenance"><span class="toc-num mono">04</span><span class="toc-title">Provenance</span><span class="leader"></span><span class="toc-ref mono">/provenance</span></a></li>
+        <li class="reveal" style="--i:4"><a href="#quickwriter"><span class="toc-num mono">05</span><span class="toc-title">The quick writer</span><span class="leader"></span><span class="toc-ref mono">/quick-writer</span></a></li>
+        <li class="reveal" style="--i:5"><a href="#keyindex"><span class="toc-num mono">06</span><span class="toc-title">Key index</span><span class="leader"></span><span class="toc-ref mono">/key-index</span></a></li>
+        <li class="reveal" style="--i:6"><a href="#specification"><span class="toc-num mono">07</span><span class="toc-title">Specification</span><span class="leader"></span><span class="toc-ref mono">/specification</span></a></li>
+        <li class="reveal" style="--i:7"><a href="#appendix"><span class="toc-num mono">A</span><span class="toc-title">Appendix: questions</span><span class="leader"></span><span class="toc-ref mono">/appendix-a</span></a></li>
+      </ol>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 01 PROCEDURE ================= -->
+    <section class="section" id="procedure">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;01</span>
+        <h2>Procedure</h2>
+        <p class="sec-note mono">THREE SECONDS FROM SEEN TO SAVED</p>
+      </header>
+      <div class="story">
+        <div class="story-visual">
+          <div class="story-plates" data-plx="20">
+            <img class="story-plate is-active" src="./art/story-1.jpg" alt="" loading="lazy" width="1400" height="933">
+            <img class="story-plate" src="./art/story-2.jpg" alt="" loading="lazy" width="1400" height="933">
+            <img class="story-plate" src="./art/story-3.jpg" alt="" loading="lazy" width="1400" height="933">
+          </div>
+          <div class="fig mono" id="story-cap">Fig. 1a &middot; Something worth keeping appears.</div>
+        </div>
+        <div class="story-steps" id="story-steps">
+          <div class="story-step" data-plate="0" data-cap="Fig. 1a &middot; Something worth keeping appears.">
+            <span class="ledger-num">1</span>
+            <h3>Copy anywhere</h3>
+            <p>An article, a chat answer, a formula, a screenshot. If you can copy it, Casrion can keep it. The app stays hidden in the tray the whole time.</p>
+          </div>
+          <div class="story-step" data-plate="1" data-cap="Fig. 1b &middot; One keystroke, and it passes through.">
+            <span class="ledger-num">2</span>
+            <h3>Press one hotkey</h3>
+            <p>Choose how it lands: plain text, heading, list, table, code block or colored emphasis. A quiet toast confirms the capture without stealing focus.</p>
+          </div>
+          <div class="story-step" data-plate="2" data-cap="Fig. 1c &middot; On the other side, a finished note.">
+            <span class="ledger-num">3</span>
+            <h3>It is already a note</h3>
+            <p>Everything arrives as clean Markdown in a file you chose. Math renders, tables align, screenshots embed. Open the window later and it is all there.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 02 INSTRUMENTS ================= -->
+    <section class="section" id="instruments">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;02</span>
+        <h2>Instruments</h2>
+        <p class="sec-note mono">INVENTORY OF THE TOOLKIT</p>
+      </header>
+      <div class="feat-grid">
+        <article class="feat reveal" style="--i:0">
+          <div class="feat-art tile-burst" aria-hidden="true"></div>
+          <span class="inv-num mono">2.1</span>
+          <h3>Global capture hotkeys</h3>
+          <p>Fifteen shortcuts that work in every application. Text, headings, lists, code, screenshots, colored highlights and more, each lands formatted.</p>
+        </article>
+        <article class="feat reveal" style="--i:1">
+          <div class="feat-art tile-wave" aria-hidden="true"></div>
+          <span class="inv-num mono">2.2</span>
+          <h3>Voice memos</h3>
+          <p>One hotkey starts recording, the same one stops it. The audio clip embeds directly in your note with a player, ready to replay while you review.</p>
+        </article>
+        <article class="feat reveal" style="--i:2">
+          <div class="feat-art tile-tunnel" aria-hidden="true"></div>
+          <span class="inv-num mono">2.3</span>
+          <h3>Source stamps</h3>
+          <p>Optional stamps remember where every capture came from: the window, the app, and the exact web address when you copy from a browser.</p>
+        </article>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 03 DEMONSTRATION ================= -->
+    <section class="section" id="demonstration">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;03</span>
+        <h2>Demonstration</h2>
+        <p class="sec-note mono">SEE IT RUN BEFORE YOU INSTALL IT</p>
+      </header>
+      <figure class="film reveal">
+        <div class="film-frame">
+          <!-- Replace the placeholder below with the walkthrough embed, e.g.
+               <iframe src="https://www.youtube.com/embed/VIDEO_ID" title="Casrion walkthrough" allowfullscreen></iframe>
+               or a self-hosted file:
+               <video controls preload="metadata" src="./casrion-demo.mp4"></video> -->
+          <div class="film-slot mono">
+            <span class="film-badge">REEL 1</span>
+            <p>THE FULL WALKTHROUGH SCREENS HERE SOON.</p>
+          </div>
+        </div>
+        <figcaption class="fig mono">Reel 1 &middot; Casrion in use, from copy to finished note.</figcaption>
+      </figure>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 03 PROVENANCE ================= -->
+    <section class="section" id="provenance">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;04</span>
+        <h2>Provenance</h2>
+        <p class="sec-note mono">EVERY FACT REMEMBERS WHERE IT CAME FROM</p>
+      </header>
+      <div class="twocol">
+        <div class="col-copy reveal">
+          <p>
+            Turn on the paperclip and each capture quietly records its origin. Copy from a
+            browser and the exact page address is saved with it. Weeks later, right-click
+            any passage and jump straight back to the source.
+          </p>
+          <ul class="plain-list">
+            <li>Window title, application and web address</li>
+            <li>Clickable links back to the original page</li>
+            <li>One click on the paperclip turns it off</li>
+          </ul>
+        </div>
+        <figure class="specimen reveal d2">
+          <figcaption class="spec-tag mono">SPECIMEN A</figcaption>
+          <div class="paper paper-static">
+            <div class="paper-head mono">Perspective_in_Painting.md</div>
+            <div class="paper-body">
+              <p class="pl">The vanishing point sits on the horizon line, and every orthogonal in the scene converges toward it.</p>
+              <p class="pl src">Source: Perspective - Wikipedia &middot; en.wikipedia.org/wiki/Perspective &middot; 9:42 pm</p>
+            </div>
+          </div>
+          <figcaption class="fig mono">Fig. 2 &middot; A passage and its origin, kept together.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 04 QUICK WRITER ================= -->
+    <section class="section" id="quickwriter">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;05</span>
+        <h2>The quick writer</h2>
+        <p class="sec-note mono">YOUR OWN THOUGHTS, WITHOUT BREAKING FLOW</p>
+      </header>
+      <div class="twocol">
+        <div class="col-copy reveal">
+          <p>
+            Not everything is a copy. Press Ctrl+Shift+Q and a small writer floats over
+            whatever you are doing. Add a heading, jot a thought, quote a line. Enter sends
+            it to your note and gets out of the way. Ctrl+Enter keeps it open for more.
+          </p>
+          <ul class="plain-list">
+            <li>Headings, lists and quotes with one keystroke</li>
+            <li>Markdown works as you type</li>
+            <li>Drafts survive if you get interrupted</li>
+          </ul>
+        </div>
+        <figure class="specimen reveal d2">
+          <figcaption class="spec-tag mono">SPECIMEN B</figcaption>
+          <div class="paper paper-static">
+            <div class="paper-head mono">Quick note &rarr; Perspective_in_Painting.md</div>
+            <div class="paper-body qw">
+              <pre class="qw-typed mono" id="q-typed"></pre><span class="paper-cursor on" id="q-cursor"></span>
+            </div>
+            <div class="qw-hint mono"><b>Enter</b> add &middot; <b>Ctrl+Enter</b> add and keep writing &middot; <b>Esc</b> close</div>
+          </div>
+          <figcaption class="fig mono">Fig. 3 &middot; The quick writer, mid thought.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 05 KEY INDEX ================= -->
+    <section class="section" id="keyindex">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;06</span>
+        <h2>Key index</h2>
+        <p class="sec-note mono">LEARN FIVE TODAY, THE REST WILL FOLLOW</p>
+      </header>
+      <div class="keys">
+        <div class="key-row reveal" style="--i:0"><span>Capture copied text</span><span class="leader"></span><kbd>Ctrl+Shift+C</kbd></div>
+        <div class="key-row reveal" style="--i:1"><span>Capture as heading</span><span class="leader"></span><kbd>Ctrl+Shift+1..3</kbd></div>
+        <div class="key-row reveal" style="--i:2"><span>Capture screenshot</span><span class="leader"></span><kbd>Ctrl+Shift+V</kbd></div>
+        <div class="key-row reveal" style="--i:3"><span>Capture code block</span><span class="leader"></span><kbd>Ctrl+Shift+K</kbd></div>
+        <div class="key-row reveal" style="--i:4"><span>Record voice memo</span><span class="leader"></span><kbd>Ctrl+Shift+M</kbd></div>
+        <div class="key-row reveal" style="--i:5"><span>Quick note popup</span><span class="leader"></span><kbd>Ctrl+Shift+Q</kbd></div>
+        <div class="key-row reveal" style="--i:6"><span>New paragraph</span><span class="leader"></span><kbd>Ctrl+Shift+N</kbd></div>
+        <div class="key-row reveal" style="--i:7"><span>Capture bold</span><span class="leader"></span><kbd>Ctrl+Shift+B</kbd></div>
+        <div class="key-row reveal" style="--i:8"><span>Capture italic</span><span class="leader"></span><kbd>Ctrl+Shift+I</kbd></div>
+        <div class="key-row reveal" style="--i:9"><span>Capture in color</span><span class="leader"></span><kbd>Alt+R / G / B</kbd></div>
+        <div class="key-row reveal" style="--i:10"><span>Undo last capture</span><span class="leader"></span><kbd>Ctrl+Shift+Z</kbd></div>
+        <div class="key-row reveal" style="--i:11"><span>Shortcut overlay</span><span class="leader"></span><kbd>Ctrl+Shift+H</kbd></div>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= 06 SPECIFICATION ================= -->
+    <section class="section" id="specification">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;07</span>
+        <h2>Specification</h2>
+        <p class="sec-note mono">THE WHOLE TRUTH, IN ONE TABLE</p>
+      </header>
+      <div class="spec-wrap">
+        <table class="spec reveal">
+          <tbody>
+            <tr><th class="mono">VERSION</th><td>1.0.0</td></tr>
+            <tr><th class="mono">PLATFORM</th><td>Windows 10 and 11</td></tr>
+            <tr><th class="mono">SIZE</th><td>About 100 MB installed</td></tr>
+            <tr><th class="mono">FORMAT</th><td>Plain Markdown files</td></tr>
+            <tr><th class="mono">STORAGE</th><td>Folders you choose, on your disk</td></tr>
+            <tr><th class="mono">NETWORK REQUESTS</th><td>None</td></tr>
+            <tr><th class="mono">ACCOUNT REQUIRED</th><td>None</td></tr>
+            <tr><th class="mono">TELEMETRY</th><td>None</td></tr>
+            <tr><th class="mono">PRICE</th><td>Free</td></tr>
+          </tbody>
+        </table>
+        <div class="stamp mono stamp-reveal" aria-hidden="true">RUNS ENTIRELY<br>ON YOUR MACHINE</div>
+      </div>
+    </section>
+
+    <!-- ================= PRIVACY BAND ================= -->
+    <section class="band" data-plx="56" aria-label="Privacy">
+      <img class="band-img" src="./art/band.jpg" alt="" loading="lazy" width="1600" height="1067">
+      <figure class="band-quote reveal">
+        <p class="band-kicker mono">PLATE IV &middot; PRIVATE BY CONSTRUCTION</p>
+        <blockquote class="pull">
+          No account. No cloud.<br><em>No one reading over your shoulder.</em>
+        </blockquote>
+        <p class="band-sub mono">CASRION MAKES ZERO NETWORK REQUESTS. THE RECORD STAYS ON YOUR MACHINE.</p>
+      </figure>
+    </section>
+
+    <!-- ================= GET CASRION ================= -->
+    <section class="section" id="download">
+      <div class="coupon reveal">
+        <div class="coupon-head mono">
+          <span>CASRION</span><span>VERSION 1.0.0</span><span>WINDOWS INSTALLER</span><span>FREE</span>
+        </div>
+        <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
+        <h2>Request your copy.</h2>
+        <p class="coupon-lead">Enter your email and the download link arrives in your inbox. One confirmation, one link, nothing else follows.</p>
+
+        <!-- MAILERLITE WIRING:
+             After creating the MailerLite embedded form, its snippet contains
+             two IDs:  ml('account', 'ACCOUNT_ID')  and  data-form="FORM_ID".
+             Paste them into data-ml-account and data-ml-form below.
+             Until both are filled in, submitting shows a "requests open
+             shortly" notice instead of sending anything. -->
+        <form class="req-form" id="req-form" data-ml-account="" data-ml-form="" novalidate>
+          <input class="req-input mono" id="req-email" type="email" required
+                 placeholder="you@example.com" autocomplete="email"
+                 aria-label="Email address for the download link">
+          <button class="btn-stamp big" type="submit">[ SEND ME THE LINK ]</button>
+        </form>
+        <p class="req-status mono" id="req-status" role="status" hidden></p>
+
+        <p class="coupon-note mono">Unsigned installer: Windows may show a SmartScreen notice on first run. See question A.1 below.</p>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
+    <!-- ================= APPENDIX A ================= -->
+    <section class="section" id="appendix">
+      <header class="sec-head reveal">
+        <span class="sec-index mono">&sect;A</span>
+        <h2>Appendix: questions</h2>
+        <p class="sec-note mono">FAIR QUESTIONS, STRAIGHT ANSWERS</p>
+      </header>
+
+      <details class="qa reveal" style="--i:0">
+        <summary><span class="qa-num mono">A.1</span>Windows says "Windows protected your PC". Is this safe?</summary>
+        <p>Yes. That notice is Microsoft SmartScreen, and it appears for any new installer that is not signed with a paid code-signing certificate. It does not mean anything harmful was found. Click <b>More info</b>, then <b>Run anyway</b>. This appears once, only at install time.</p>
+      </details>
+      <details class="qa reveal" style="--i:1">
+        <summary><span class="qa-num mono">A.2</span>Where are my notes stored?</summary>
+        <p>In ordinary Markdown files, inside folders you pick yourself. Screenshots and voice memos sit in an assets folder next to each note. You can open, move, back up or sync them with any tool you like.</p>
+      </details>
+      <details class="qa reveal" style="--i:2">
+        <summary><span class="qa-num mono">A.3</span>Does it need an internet connection?</summary>
+        <p>No. Casrion is completely offline. It makes no network requests at all: no account, no sync servers, no analytics. It works the same on a plane as it does at home.</p>
+      </details>
+      <details class="qa reveal" style="--i:3">
+        <summary><span class="qa-num mono">A.4</span>How do I quit or update it?</summary>
+        <p>Closing the window keeps Casrion capturing from the system tray. To quit fully, right-click the tray icon and choose Quit. To update, request the newer installer from this page and run it over your existing install. Your notes are never touched.</p>
+      </details>
+      <details class="qa reveal" style="--i:4">
+        <summary><span class="qa-num mono">A.5</span>Why is the download sent by email?</summary>
+        <p>So each copy can be counted honestly. You enter your address, confirm it once, and the installer link lands in your inbox. That is the whole exchange: no newsletter follows, and the automated message includes an unsubscribe link if you never want to hear about updates.</p>
+      </details>
+    </section>
+
+    <!-- ================= COLOPHON ================= -->
+    <footer class="colophon">
+      <div class="rule-double"></div>
+      <p class="mono">CASRION &middot; A QUIET INSTRUMENT FOR PEOPLE WHO TAKE NOTES</p>
+      <p class="mono end">+ END OF DOCUMENT +</p>
+    </footer>
+
+  </div>
+
+  <script src="./main.js"></script>
+</body>
+</html>
