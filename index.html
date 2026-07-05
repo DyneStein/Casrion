@@ -353,13 +353,10 @@
         <h2>Request your copy.</h2>
         <p class="coupon-lead">Enter your email and the download link arrives in your inbox. One confirmation, one link, nothing else follows.</p>
 
-        <!-- MAILERLITE WIRING:
-             After creating the MailerLite embedded form, its snippet contains
-             two IDs:  ml('account', 'ACCOUNT_ID')  and  data-form="FORM_ID".
-             Paste them into data-ml-account and data-ml-form below.
-             Until both are filled in, submitting shows a "requests open
-             shortly" notice instead of sending anything. -->
-        <form class="req-form" id="req-form" data-ml-account="" data-ml-form="" novalidate>
+        <!-- MailerLite wiring: account 2491572, embedded form "Casrion
+             Downloads" (slug h8T19L, internal id below). The submit handler
+             in main.js posts to assets.mailerlite.com using these two IDs. -->
+        <form class="req-form" id="req-form" data-ml-account="2491572" data-ml-form="192189138858935698" novalidate>
           <input class="req-input mono" id="req-email" type="email" required
                  placeholder="you@example.com" autocomplete="email"
                  aria-label="Email address for the download link">
