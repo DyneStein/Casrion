@@ -211,7 +211,7 @@
       }).then(function (data) {
         if (data && data.success === false) throw new Error('rejected');
         reqForm.hidden = true;
-        reqSay('DONE. THE DOWNLOAD LINK IS ON ITS WAY TO YOUR INBOX. IF NOTHING ARRIVES WITHIN A MINUTE OR TWO, CHECK THE SPAM FOLDER.', true);
+        reqSay('DONE. THE DOWNLOAD LINK IS ON ITS WAY TO YOUR INBOX. IF NOTHING ARRIVES, CHECK THE PROMOTIONS TAB, OR SEARCH YOUR MAIL FOR CASRION: EACH ADDRESS GETS THE EMAIL ONCE, AND THE ORIGINAL LINK KEEPS WORKING.', true);
       }).catch(function () {
         reqSay('SOMETHING WENT WRONG SENDING THE REQUEST. PLEASE TRY AGAIN IN A MINUTE.');
         btn.disabled = false;
