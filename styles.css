@@ -634,65 +634,8 @@ html.no-anim .band { height: 640px; }
   font-size: 1rem; line-height: 1.7; color: var(--ink-soft);
 }
 
-/* ── Pull-tab unwrap download (Apple-box style roll) ── */
-.tear {
-  position: relative;
-  width: min(360px, 100%);
-  height: 56px;
-  margin: 6px auto 0;
-}
-.tear-btn {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  width: 100%;
-}
-/* The paper film that wraps the button. Drag it and it rolls up. */
-.tear-film {
-  position: absolute; inset: 0;
-  cursor: grab;
-  touch-action: none;
-  user-select: none; -webkit-user-select: none;
-}
-.tear-film:active { cursor: grabbing; }
-.tear-film:focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; }
-.tear.is-open .tear-film { pointer-events: none; }
-
-/* Still-wrapped flat paper, anchored to the right; JS shrinks its width
-   as the coil rolls leftward across it. */
-.tear-flat {
-  position: absolute; top: 0; right: 0; bottom: 0; left: auto;
-  width: 100%;
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--ink-soft);
-  font-size: 11.5px; letter-spacing: 0.2em; text-transform: uppercase;
-  background:
-    repeating-linear-gradient(92deg, transparent 0 5px, rgba(138, 90, 43, 0.05) 5px 6px),
-    linear-gradient(176deg, #efe6d4, #e3d6bd);
-  border: 1px solid var(--rule);
-  box-shadow: inset 9px 0 12px -9px rgba(36, 29, 21, 0.4), 0 3px 7px rgba(36, 29, 21, 0.14);
-}
-.tear-text { white-space: nowrap; pointer-events: none; }
-.tear-text::after { content: " \2192"; color: var(--stamp); }
-
-/* The rolled-up coil that travels as you pull. Its horizontal shading reads
-   as a paper tube; the hairline layer scrolls (via background-position in JS)
-   so it looks like it is spinning. */
-.tear-roll {
-  position: absolute; top: -3px; bottom: -3px; left: 0;
-  width: 16px;
-  border-radius: 46% / 50%;
-  background:
-    repeating-linear-gradient(90deg, rgba(36, 29, 21, 0.16) 0 1px, transparent 1px 5px),
-    linear-gradient(90deg, #9c855f 0%, #d8c6a4 28%, #f6efe0 50%, #e0cfb0 70%, #8f7a55 100%);
-  background-repeat: repeat, no-repeat;
-  box-shadow: 0 5px 9px rgba(36, 29, 21, 0.3), inset 0 0 0 1px rgba(36, 29, 21, 0.12);
-  opacity: 0;
-  will-change: transform, width;
-}
-@media (max-width: 400px) {
-  .tear-flat { font-size: 10px; letter-spacing: 0.1em; }
-}
+/* ── Download button ─────────────────────────────── */
+.dl-wrap { display: flex; justify-content: center; margin: 6px auto 0; }
 
 /* techie star nudge */
 .coupon-star {

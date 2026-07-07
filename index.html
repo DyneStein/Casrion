@@ -351,22 +351,13 @@
         </div>
         <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
         <h2>Okay, go get it.</h2>
-        <p class="coupon-lead">No email, no sign-up, no nothing. Pull the tab and the paper rolls up off your download.</p>
+        <p class="coupon-lead">No email, no sign-up, no nothing. One click and it is yours.</p>
 
-        <!-- Pull-tab unwrap. The button hides under a paper film; drag the tab
-             and the paper rolls into a little coil (like the tab on the back of
-             an Apple box), revealing the button (logic in main.js). The /get
-             link 302-redirects to the installer, so the version lives in one
-             place (see vercel.json). -->
-        <div class="tear" id="tear">
-          <a class="btn-stamp big tear-btn" href="/get">[ DOWNLOAD FOR WINDOWS ]</a>
-          <div class="tear-film" id="tear-film" role="button" tabindex="0"
-               aria-label="Pull the tab to unwrap the download button">
-            <div class="tear-flat"><span class="tear-text mono">pull the tab</span></div>
-            <div class="tear-roll" aria-hidden="true"></div>
-          </div>
-        </div>
-        <noscript><style>.tear-film{display:none}</style></noscript>
+        <!-- Direct download. /get 302-redirects to the installer, so the
+             version lives in one place (see vercel.json). -->
+        <p class="dl-wrap">
+          <a class="btn-stamp big" href="/get">[ DOWNLOAD FOR WINDOWS ]</a>
+        </p>
 
         <p class="coupon-note mono">Heads up: the installer is unsigned, so Windows might throw a SmartScreen notice the first time you run it. Totally normal, see question A.1 below.</p>
         <p class="coupon-star mono">and hey, if you read source code for fun, pweez <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">star the repo</a> &#9733; it genuinely makes my day.</p>
@@ -401,11 +392,11 @@
       </details>
       <details class="qa reveal" style="--i:4">
         <summary><span class="qa-num mono">A.5</span>Do I need an account or my email?</summary>
-        <p>Nope. Pull the tab, the paper rolls up, and the download just starts. No address, no sign-up, no newsletter sneaking into your inbox. That is the whole deal.</p>
+        <p>Nope. Hit the button and the download just starts. No address, no sign-up, no newsletter sneaking into your inbox. That is the whole deal.</p>
       </details>
       <details class="qa reveal" style="--i:5">
         <summary><span class="qa-num mono">A.6</span>Download did not start, or I want the latest?</summary>
-        <p>Just pull the tab again, the link always grabs the current version. If your browser is being weird, right-click it and choose <b>Save link as</b>. Still stuck? Ping me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.</p>
+        <p>Just hit the button again, the link always grabs the current version. If your browser is being weird, right-click it and choose <b>Save link as</b>. Still stuck? Ping me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.</p>
       </details>
     </section>
 
