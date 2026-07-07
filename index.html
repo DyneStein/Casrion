@@ -350,19 +350,15 @@
           <span>CASRION</span><span>VERSION 1.0.0</span><span>WINDOWS INSTALLER</span><span>FREE</span>
         </div>
         <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
-        <h2>Request your copy.</h2>
-        <p class="coupon-lead">Enter your email and the download link arrives in your inbox. One email, one link, nothing else follows.</p>
+        <h2>Download your copy.</h2>
+        <p class="coupon-lead">One click, one file, nothing else follows. No email, no account &mdash; the installer downloads straight from GitHub.</p>
 
-        <!-- MailerLite wiring: account 2491572, embedded form "Casrion
-             Downloads" (slug h8T19L, internal id below). The submit handler
-             in main.js posts to assets.mailerlite.com using these two IDs. -->
-        <form class="req-form" id="req-form" data-ml-account="2491572" data-ml-form="192189138858935698" novalidate>
-          <input class="req-input mono" id="req-email" type="email" required
-                 placeholder="you@example.com" autocomplete="email"
-                 aria-label="Email address for the download link">
-          <button class="btn-stamp big" type="submit">[ SEND ME THE LINK ]</button>
-        </form>
-        <p class="req-status mono" id="req-status" role="status" hidden></p>
+        <!-- Direct download. /get 302-redirects to the GitHub release asset
+             (see vercel.json), so the version lives in one place and GitHub
+             still counts every download. -->
+        <p class="req-form">
+          <a class="btn-stamp big" href="/get">[ DOWNLOAD FOR WINDOWS ]</a>
+        </p>
 
         <p class="coupon-note mono">Unsigned installer: Windows may show a SmartScreen notice on first run. See question A.1 below.</p>
       </div>
@@ -392,15 +388,15 @@
       </details>
       <details class="qa reveal" style="--i:3">
         <summary><span class="qa-num mono">A.4</span>How do I quit or update it?</summary>
-        <p>Closing the window keeps Casrion capturing from the system tray. To quit fully, right-click the tray icon and choose Quit. To update, request the newer installer from this page and run it over your existing install. Your notes are never touched.</p>
+        <p>Closing the window keeps Casrion capturing from the system tray. To quit fully, right-click the tray icon and choose Quit. To update, download the newer installer from this page and run it over your existing install. Your notes are never touched.</p>
       </details>
       <details class="qa reveal" style="--i:4">
-        <summary><span class="qa-num mono">A.5</span>Why is the download sent by email?</summary>
-        <p>So each copy can be counted honestly. You enter your address and the installer link lands in your inbox. That is the whole exchange: no newsletter follows, and the message includes an unsubscribe link if you never want to hear about updates.</p>
+        <summary><span class="qa-num mono">A.5</span>Do I need an account or to give my email?</summary>
+        <p>No. The download button hands you the installer straight from GitHub &mdash; no address, no sign-up, no newsletter. That is the whole exchange.</p>
       </details>
       <details class="qa reveal" style="--i:5">
-        <summary><span class="qa-num mono">A.6</span>I requested before and no new email arrived.</summary>
-        <p>Each address receives the download email once. Search your mail for <b>Casrion</b>: the link in the original message keeps working and always fetches the current version. If the email is truly gone, write to <a href="mailto:hello@casrion.com">hello@casrion.com</a> and a fresh copy will be sent over.</p>
+        <summary><span class="qa-num mono">A.6</span>The download did not start, or I want the latest version.</summary>
+        <p>Just press the download button again &mdash; the link always fetches the current release. If your browser blocks it, right-click and choose <b>Save link as</b>. Any trouble, write to <a href="mailto:hello@casrion.com">hello@casrion.com</a>.</p>
       </details>
     </section>
 

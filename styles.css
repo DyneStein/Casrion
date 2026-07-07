@@ -640,6 +640,9 @@ html.no-anim .band { height: 640px; }
   justify-content: center; align-items: stretch;
   max-width: 560px; margin: 0 auto;
 }
+/* The class rule above out-specifies the UA [hidden] rule, so restore it:
+   without this, reqForm.hidden = true on success never hides the form. */
+.req-form[hidden] { display: none; }
 .req-input {
   flex: 1 1 260px; min-width: 0;
   padding: 14px 16px 13px;
