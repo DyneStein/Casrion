@@ -162,79 +162,92 @@
     if (qCursor) qCursor.classList.remove('on');
   }
 
-  /* ── Tear-to-open download ──────────────────────── */
-  /* The download button sits under a scrap of aged paper. Drag or tap the
-     paper and it rips off, revealing the button. Pointer events cover both
-     mouse and touch; a <noscript> block hides the paper when JS is off, and
-     the button underneath stays a normal, keyboard-reachable link. */
+  /* ── Pull-tab unwrap download ───────────────────── */
+  /* The button hides under a paper film. Drag the film and the paper rolls up
+     into a little coil that travels across it (like the tab on the back of an
+     Apple box), uncovering the button. `reveal` is how far the coil has rolled,
+     in pixels. Pointer events cover mouse + touch; a plain tap or keyboard
+     press unwraps it too, and a <noscript> block hides the film when JS is
+     off so the button underneath stays a normal, reachable link. */
   var tear = document.getElementById('tear');
-  var strip = document.getElementById('tear-strip');
+  var film = document.getElementById('tear-film');
+  var flat = tear && tear.querySelector('.tear-flat');
+  var roll = tear && tear.querySelector('.tear-roll');
 
-  if (tear && strip) {
-    var opened = false, dragging = false, startX = 0, dx = 0, moved = false;
+  if (tear && film && flat && roll) {
+    var W = tear.offsetWidth, reveal = 0, opened = false;
+    var dragging = false, startX = 0, startReveal = 0, moved = false, raf = 0;
 
-    function ripOff() {
+    function render(r) {
+      reveal = r < 0 ? 0 : (r > W ? W : r);
+      var dia = 16 + reveal * 0.05;           // coil thickens as it gathers paper
+      flat.style.width = (W - reveal) + 'px';
+      roll.style.width = dia + 'px';
+      roll.style.transform = 'translateX(' + (reveal - dia / 2) + 'px)';
+      roll.style.backgroundPosition = (-reveal * 1.6) + 'px 0, 0 0'; // spin the surface
+      roll.style.opacity = reveal > 1.5 ? '1' : '0';
+    }
+
+    function tween(to, dur, done) {
+      cancelAnimationFrame(raf);
+      var from = reveal, t0 = performance.now();
+      (function step(now) {
+        var k = Math.min((now - t0) / dur, 1);
+        render(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+        if (k < 1) raf = requestAnimationFrame(step);
+        else if (done) done();
+      })(performance.now());
+    }
+
+    function unwrap() {
       if (opened) return;
       opened = true;
-      var w = tear.offsetWidth;
-      strip.classList.remove('is-dragging');
-      strip.style.transition =
-        'transform 0.6s cubic-bezier(0.2, 0.75, 0.25, 1), opacity 0.5s ease 0.08s';
-      strip.style.transform = 'translateX(' + (w + 90) + 'px) rotate(15deg)';
-      strip.style.opacity = '0';
-      tear.classList.add('is-open');
-      setTimeout(function () { strip.style.display = 'none'; }, 700);
+      tween(W, 460, function () {
+        tear.classList.add('is-open');
+        roll.style.transition = 'opacity 0.35s ease';
+        roll.style.opacity = '0';
+        setTimeout(function () { film.style.display = 'none'; }, 360);
+      });
     }
 
-    function snapBack() {
-      strip.classList.remove('is-dragging');
-      strip.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-      strip.style.transform = '';
-      strip.style.opacity = '';
-    }
+    render(0);
 
     if (instant) {
       /* Reduced motion / screenshot mode: just show the button. */
       tear.classList.add('is-open');
-      strip.style.display = 'none';
+      film.style.display = 'none';
     } else {
-      strip.addEventListener('pointerdown', function (e) {
+      film.addEventListener('pointerdown', function (e) {
         if (opened) return;
-        dragging = true; moved = false; startX = e.clientX; dx = 0;
-        try { strip.setPointerCapture(e.pointerId); } catch (err) {}
-        strip.classList.add('is-dragging');
+        dragging = true; moved = false;
+        W = tear.offsetWidth;
+        startX = e.clientX; startReveal = reveal;
+        try { film.setPointerCapture(e.pointerId); } catch (err) {}
+        cancelAnimationFrame(raf);
       });
 
-      strip.addEventListener('pointermove', function (e) {
+      film.addEventListener('pointermove', function (e) {
         if (!dragging) return;
-        dx = e.clientX - startX;
-        if (dx < 0) dx = 0;
-        if (dx > 4) moved = true;
-        var w = tear.offsetWidth || 1;
-        var t = Math.min(dx, w);
-        var rot = Math.min((dx / w) * 9, 9);
-        strip.style.transform = 'translateX(' + t + 'px) rotate(' + rot + 'deg)';
-        strip.style.opacity = String(Math.max(1 - dx / (w * 1.3), 0.15));
+        var d = e.clientX - startX;
+        if (Math.abs(d) > 4) moved = true;
+        render(startReveal + d);
       });
 
-      var endDrag = function () {
+      var end = function () {
         if (!dragging) return;
         dragging = false;
-        var w = tear.offsetWidth || 1;
-        if (dx > w * 0.42) ripOff();
-        else snapBack();
+        if (reveal > W * 0.4) unwrap();
+        else tween(0, 300);
       };
-      strip.addEventListener('pointerup', endDrag);
-      strip.addEventListener('pointercancel', endDrag);
+      film.addEventListener('pointerup', end);
+      film.addEventListener('pointercancel', end);
 
-      /* A plain tap or keyboard press opens it too. */
-      strip.addEventListener('click', function () {
-        if (!opened && !moved) ripOff();
-      });
-      strip.addEventListener('keydown', function (e) {
+      /* A plain tap or keyboard press unwraps it too. */
+      film.addEventListener('click', function () { if (!opened && !moved) unwrap(); });
+      film.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
           e.preventDefault();
-          ripOff();
+          unwrap();
         }
       });
     }

@@ -634,7 +634,7 @@ html.no-anim .band { height: 640px; }
   font-size: 1rem; line-height: 1.7; color: var(--ink-soft);
 }
 
-/* ── Tear-to-open download ───────────────────────── */
+/* ── Pull-tab unwrap download (Apple-box style roll) ── */
 .tear {
   position: relative;
   width: min(360px, 100%);
@@ -646,48 +646,52 @@ html.no-anim .band { height: 640px; }
   display: flex; align-items: center; justify-content: center;
   width: 100%;
 }
-/* A scrap of aged paper laid over the button. Drag it and it rips off. */
-.tear-strip {
+/* The paper film that wraps the button. Drag it and it rolls up. */
+.tear-film {
   position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center; gap: 12px;
-  padding: 0 18px;
   cursor: grab;
   touch-action: none;
   user-select: none; -webkit-user-select: none;
+}
+.tear-film:active { cursor: grabbing; }
+.tear-film:focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; }
+.tear.is-open .tear-film { pointer-events: none; }
+
+/* Still-wrapped flat paper, anchored to the right; JS shrinks its width
+   as the coil rolls leftward across it. */
+.tear-flat {
+  position: absolute; top: 0; right: 0; bottom: 0; left: auto;
+  width: 100%;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
   color: var(--ink-soft);
   font-size: 11.5px; letter-spacing: 0.2em; text-transform: uppercase;
   background:
     repeating-linear-gradient(92deg, transparent 0 5px, rgba(138, 90, 43, 0.05) 5px 6px),
     linear-gradient(176deg, #efe6d4, #e3d6bd);
   border: 1px solid var(--rule);
-  box-shadow: 0 3px 7px rgba(36, 29, 21, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  /* jagged torn edges along the top and bottom */
-  clip-path: polygon(
-    0% 8%, 7% 2%, 14% 9%, 21% 1%, 28% 8%, 35% 2%, 42% 9%, 50% 2%, 57% 9%,
-    64% 2%, 71% 8%, 78% 1%, 85% 9%, 92% 2%, 100% 7%,
-    100% 93%, 93% 99%, 85% 92%, 78% 99%, 71% 92%, 64% 99%, 57% 91%, 50% 99%,
-    43% 91%, 36% 99%, 29% 92%, 22% 99%, 15% 92%, 8% 99%, 0% 93%
-  );
-  will-change: transform, opacity;
-  transition: transform 0.3s ease;
+  box-shadow: inset 9px 0 12px -9px rgba(36, 29, 21, 0.4), 0 3px 7px rgba(36, 29, 21, 0.14);
 }
-.tear-strip:active { cursor: grabbing; }
-.tear-strip.is-dragging { transition: none; }
-.tear-strip:focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; }
-/* the dashed perforation the paper tears along */
-.tear-grip {
-  flex: 0 0 auto; width: 3px; height: 58%;
-  background: repeating-linear-gradient(to bottom, var(--ink-faint) 0 2px, transparent 2px 6px);
-  opacity: 0.7;
-}
-.tear-text { white-space: nowrap; }
-.tear-arrow { color: var(--stamp); font-size: 15px; letter-spacing: 0; }
-.tear.is-open .tear-strip { pointer-events: none; }
-@media (prefers-reduced-motion: reduce) {
-  .tear-strip { transition: none; }
+.tear-text { white-space: nowrap; pointer-events: none; }
+.tear-text::after { content: " \2192"; color: var(--stamp); }
+
+/* The rolled-up coil that travels as you pull. Its horizontal shading reads
+   as a paper tube; the hairline layer scrolls (via background-position in JS)
+   so it looks like it is spinning. */
+.tear-roll {
+  position: absolute; top: -3px; bottom: -3px; left: 0;
+  width: 16px;
+  border-radius: 46% / 50%;
+  background:
+    repeating-linear-gradient(90deg, rgba(36, 29, 21, 0.16) 0 1px, transparent 1px 5px),
+    linear-gradient(90deg, #9c855f 0%, #d8c6a4 28%, #f6efe0 50%, #e0cfb0 70%, #8f7a55 100%);
+  background-repeat: repeat, no-repeat;
+  box-shadow: 0 5px 9px rgba(36, 29, 21, 0.3), inset 0 0 0 1px rgba(36, 29, 21, 0.12);
+  opacity: 0;
+  will-change: transform, width;
 }
 @media (max-width: 400px) {
-  .tear-strip { font-size: 10px; letter-spacing: 0.1em; gap: 9px; }
+  .tear-flat { font-size: 10px; letter-spacing: 0.1em; }
 }
 
 /* techie star nudge */
