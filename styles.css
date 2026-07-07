@@ -634,39 +634,73 @@ html.no-anim .band { height: 640px; }
   font-size: 1rem; line-height: 1.7; color: var(--ink-soft);
 }
 
-/* ── Download request form ───────────────────────── */
-.req-form {
-  display: flex; flex-wrap: wrap; gap: 12px;
-  justify-content: center; align-items: stretch;
-  max-width: 560px; margin: 0 auto;
+/* ── Tear-to-open download ───────────────────────── */
+.tear {
+  position: relative;
+  width: min(360px, 100%);
+  height: 56px;
+  margin: 6px auto 0;
 }
-/* The class rule above out-specifies the UA [hidden] rule, so restore it:
-   without this, reqForm.hidden = true on success never hides the form. */
-.req-form[hidden] { display: none; }
-.req-input {
-  flex: 1 1 260px; min-width: 0;
-  padding: 14px 16px 13px;
-  font-size: 13px; letter-spacing: 0.05em;
-  color: var(--ink);
-  background: var(--paper-card);
-  border: 1.5px solid var(--rule);
-  border-radius: 3px;
-  outline: none;
-  box-shadow: inset 0 1px 3px rgba(36, 29, 21, 0.06);
+.tear-btn {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%;
 }
-.req-input::placeholder { color: var(--ink-faint); }
-.req-input:focus { border-color: var(--stamp); }
-.req-form .btn-stamp.big { flex: 0 0 auto; }
-.req-status {
-  margin: 16px auto 0;
-  max-width: 52ch;
-  font-size: 11px; letter-spacing: 0.1em; line-height: 1.8;
-  color: var(--stamp);
+/* A scrap of aged paper laid over the button. Drag it and it rips off. */
+.tear-strip {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 0 18px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none; -webkit-user-select: none;
+  color: var(--ink-soft);
+  font-size: 11.5px; letter-spacing: 0.2em; text-transform: uppercase;
+  background:
+    repeating-linear-gradient(92deg, transparent 0 5px, rgba(138, 90, 43, 0.05) 5px 6px),
+    linear-gradient(176deg, #efe6d4, #e3d6bd);
+  border: 1px solid var(--rule);
+  box-shadow: 0 3px 7px rgba(36, 29, 21, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  /* jagged torn edges along the top and bottom */
+  clip-path: polygon(
+    0% 8%, 7% 2%, 14% 9%, 21% 1%, 28% 8%, 35% 2%, 42% 9%, 50% 2%, 57% 9%,
+    64% 2%, 71% 8%, 78% 1%, 85% 9%, 92% 2%, 100% 7%,
+    100% 93%, 93% 99%, 85% 92%, 78% 99%, 71% 92%, 64% 99%, 57% 91%, 50% 99%,
+    43% 91%, 36% 99%, 29% 92%, 22% 99%, 15% 92%, 8% 99%, 0% 93%
+  );
+  will-change: transform, opacity;
+  transition: transform 0.3s ease;
 }
-.req-status.ok { color: var(--ink-soft); }
-@media (max-width: 560px) {
-  .req-form .btn-stamp.big { flex: 1 1 100%; }
+.tear-strip:active { cursor: grabbing; }
+.tear-strip.is-dragging { transition: none; }
+.tear-strip:focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; }
+/* the dashed perforation the paper tears along */
+.tear-grip {
+  flex: 0 0 auto; width: 3px; height: 58%;
+  background: repeating-linear-gradient(to bottom, var(--ink-faint) 0 2px, transparent 2px 6px);
+  opacity: 0.7;
 }
+.tear-text { white-space: nowrap; }
+.tear-arrow { color: var(--stamp); font-size: 15px; letter-spacing: 0; }
+.tear.is-open .tear-strip { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tear-strip { transition: none; }
+}
+@media (max-width: 400px) {
+  .tear-strip { font-size: 10px; letter-spacing: 0.1em; gap: 9px; }
+}
+
+/* techie star nudge */
+.coupon-star {
+  margin-top: 14px;
+  font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
+  max-width: 46ch; margin-left: auto; margin-right: auto; line-height: 1.7;
+}
+.coupon-star a {
+  color: var(--stamp); text-decoration: none;
+  border-bottom: 1px solid rgba(156, 74, 31, 0.4);
+}
+.coupon-star a:hover { border-bottom-color: var(--stamp); }
 
 /* ── Appendix ────────────────────────────────────── */
 .qa {

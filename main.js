@@ -162,60 +162,81 @@
     if (qCursor) qCursor.classList.remove('on');
   }
 
-  /* ── Download request form ──────────────────────── */
-  /* Submits to MailerLite once data-ml-account / data-ml-form are filled in
-     (see the comment in index.html). Until then it shows a polite notice. */
-  var reqForm = document.getElementById('req-form');
-  var reqEmail = document.getElementById('req-email');
-  var reqStatus = document.getElementById('req-status');
+  /* ── Tear-to-open download ──────────────────────── */
+  /* The download button sits under a scrap of aged paper. Drag or tap the
+     paper and it rips off, revealing the button. Pointer events cover both
+     mouse and touch; a <noscript> block hides the paper when JS is off, and
+     the button underneath stays a normal, keyboard-reachable link. */
+  var tear = document.getElementById('tear');
+  var strip = document.getElementById('tear-strip');
 
-  function reqSay(msg, ok) {
-    if (!reqStatus) return;
-    reqStatus.hidden = false;
-    reqStatus.textContent = msg;
-    reqStatus.classList.toggle('ok', !!ok);
-  }
+  if (tear && strip) {
+    var opened = false, dragging = false, startX = 0, dx = 0, moved = false;
 
-  if (reqForm) {
-    reqForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var account = reqForm.getAttribute('data-ml-account');
-      var formId = reqForm.getAttribute('data-ml-form');
-      var value = (reqEmail.value || '').trim();
+    function ripOff() {
+      if (opened) return;
+      opened = true;
+      var w = tear.offsetWidth;
+      strip.classList.remove('is-dragging');
+      strip.style.transition =
+        'transform 0.6s cubic-bezier(0.2, 0.75, 0.25, 1), opacity 0.5s ease 0.08s';
+      strip.style.transform = 'translateX(' + (w + 90) + 'px) rotate(15deg)';
+      strip.style.opacity = '0';
+      tear.classList.add('is-open');
+      setTimeout(function () { strip.style.display = 'none'; }, 700);
+    }
 
-      if (!value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        reqSay('THAT ADDRESS DOES NOT LOOK RIGHT. CHECK IT AND TRY AGAIN.');
-        reqEmail.focus();
-        return;
-      }
-      if (!account || !formId) {
-        reqSay('REQUESTS OPEN VERY SHORTLY. THIS FORM IS STILL BEING CONNECTED. PLEASE CHECK BACK SOON.');
-        return;
-      }
+    function snapBack() {
+      strip.classList.remove('is-dragging');
+      strip.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+      strip.style.transform = '';
+      strip.style.opacity = '';
+    }
 
-      var btn = reqForm.querySelector('button');
-      btn.disabled = true;
-      reqSay('SENDING...');
-
-      var body = new URLSearchParams();
-      body.set('fields[email]', value);
-      body.set('ml-submit', '1');
-      body.set('anticsrf', 'true');
-
-      fetch('https://assets.mailerlite.com/jsonp/' + account + '/forms/' + formId + '/subscribe', {
-        method: 'POST',
-        body: body
-      }).then(function (res) {
-        if (!res.ok) throw new Error('bad status');
-        return res.json().catch(function () { return {}; });
-      }).then(function (data) {
-        if (data && data.success === false) throw new Error('rejected');
-        reqForm.hidden = true;
-        reqSay('DONE. THE DOWNLOAD LINK IS ON ITS WAY TO YOUR INBOX. IF NOTHING ARRIVES, CHECK THE PROMOTIONS TAB, OR SEARCH YOUR MAIL FOR CASRION: EACH ADDRESS GETS THE EMAIL ONCE, AND THE ORIGINAL LINK KEEPS WORKING.', true);
-      }).catch(function () {
-        reqSay('SOMETHING WENT WRONG SENDING THE REQUEST. PLEASE TRY AGAIN IN A MINUTE.');
-        btn.disabled = false;
+    if (instant) {
+      /* Reduced motion / screenshot mode: just show the button. */
+      tear.classList.add('is-open');
+      strip.style.display = 'none';
+    } else {
+      strip.addEventListener('pointerdown', function (e) {
+        if (opened) return;
+        dragging = true; moved = false; startX = e.clientX; dx = 0;
+        try { strip.setPointerCapture(e.pointerId); } catch (err) {}
+        strip.classList.add('is-dragging');
       });
-    });
+
+      strip.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        dx = e.clientX - startX;
+        if (dx < 0) dx = 0;
+        if (dx > 4) moved = true;
+        var w = tear.offsetWidth || 1;
+        var t = Math.min(dx, w);
+        var rot = Math.min((dx / w) * 9, 9);
+        strip.style.transform = 'translateX(' + t + 'px) rotate(' + rot + 'deg)';
+        strip.style.opacity = String(Math.max(1 - dx / (w * 1.3), 0.15));
+      });
+
+      var endDrag = function () {
+        if (!dragging) return;
+        dragging = false;
+        var w = tear.offsetWidth || 1;
+        if (dx > w * 0.42) ripOff();
+        else snapBack();
+      };
+      strip.addEventListener('pointerup', endDrag);
+      strip.addEventListener('pointercancel', endDrag);
+
+      /* A plain tap or keyboard press opens it too. */
+      strip.addEventListener('click', function () {
+        if (!opened && !moved) ripOff();
+      });
+      strip.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          ripOff();
+        }
+      });
+    }
   }
 })();
