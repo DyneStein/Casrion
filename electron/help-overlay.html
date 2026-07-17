@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Casrion Help</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      overflow: hidden;
+      background: rgba(36, 29, 21, 0.4);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #241d15;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; justify-content: center; align-items: flex-start;
+      height: calc(100vh - 40px);
+    }
+    .help-panel {
+      background: rgba(246, 239, 225, 0.99);
+      border: 1.5px solid #9c4a1f;
+      border-radius: 3px;
+      padding: 24px 28px;
+      box-shadow: 5px 6px 0 rgba(36, 29, 21, 0.28), 0 20px 60px rgba(0, 0, 0, 0.25);
+      width: 420px;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+    .help-panel::-webkit-scrollbar { width: 6px; }
+    .help-panel::-webkit-scrollbar-thumb { background: rgba(36, 29, 21, 0.22); border-radius: 4px; }
+    .help-panel::-webkit-scrollbar-track { background: transparent; }
+    .help-title {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 13px; font-weight: 700; color: #241d15;
+      margin-bottom: 16px; text-align: center;
+      text-transform: uppercase; letter-spacing: 0.22em;
+      -webkit-app-region: drag;
+      cursor: grab;
+      padding: 6px 0;
+      margin-top: -10px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .help-logo {
+      width: 56px; height: 56px; object-fit: contain;
+    }
+    .help-title:active { cursor: grabbing; }
+    .shortcut-row, .section-label, .help-footer {
+      -webkit-app-region: no-drag;
+    }
+    .help-subtitle {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 9.5px; color: #8c7d69; text-align: center;
+      margin-top: -12px; margin-bottom: 14px;
+    }
+    .shortcut-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(36, 29, 21, 0.1);
+    }
+    .shortcut-row:last-child { border-bottom: none; }
+    .shortcut-action {
+      font-size: 12px; color: #5f5344; font-weight: 500;
+    }
+    .shortcut-keys {
+      display: flex; align-items: center; gap: 3px;
+    }
+    .key {
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(36, 29, 21, 0.24);
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 11px;
+      color: #241d15;
+    }
+    .key-sep { font-size: 9px; color: #99896f; }
+    .section-label {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 9.5px; font-weight: 600; color: #9c4a1f;
+      text-transform: uppercase; letter-spacing: 0.16em;
+      margin-top: 12px; margin-bottom: 4px;
+    }
+    .help-footer {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      text-align: center; margin-top: 14px;
+      font-size: 9.5px; color: #99896f; letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+  <div class="help-panel">
+    <div class="help-title">Keyboard Shortcuts</div>
+    <div class="help-subtitle">Press Ctrl+Shift+H to toggle this overlay</div>
+
+    <div class="section-label">Step 1: Copy (Ctrl+C), then:</div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Append Text</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">C</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Heading 1</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">1</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Heading 2</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">2</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Heading 3</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">3</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Code Block</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">K</span></div>
+    </div>
+
+    <div class="section-label">Formatting (after Ctrl+C)</div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Bold Text</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">B</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Italic Text</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">I</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Color: Red / Green / Blue</span>
+      <div class="shortcut-keys">
+        <span class="key">Alt</span><span class="key-sep">+</span><span class="key">R</span>
+        <span class="key-sep">/</span>
+        <span class="key">G</span>
+        <span class="key-sep">/</span>
+        <span class="key">B</span>
+      </div>
+    </div>
+
+    <div class="section-label">Media &amp; Tools</div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Paste Image</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">V</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Record Voice Memo</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">M</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Type a Quick Note</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">Q</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">New Paragraph</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">N</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Undo Last</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">Z</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Redo</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">Y</span></div>
+    </div>
+    <div class="shortcut-row">
+      <span class="shortcut-action">Toggle Help Menu</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">H</span></div>
+    </div>
+
+    <div class="help-footer">Press Ctrl+Shift+H or click outside to close</div>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    // The dimmed area around the panel counts as "outside": clicking it closes.
+    document.body.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('.help-panel')) ipcRenderer.send('help-overlay-hide');
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') ipcRenderer.send('help-overlay-hide');
+    });
+  </script>
+</body>
+</html>

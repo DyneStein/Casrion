@@ -1,0 +1,1992 @@
+const { app, BrowserWindow, globalShortcut, clipboard, Tray, Menu, ipcMain, nativeImage, dialog, protocol, shell } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const { Readable } = require('stream');
+const { spawn } = require('child_process');
+const { normalizeCapture, stripColorMarkup } = require('./capture-normalize.cjs');
+const explainFeature = require('./explain.cjs');
+
+// Build integrity tag — do not remove.
+const APP_MARK = 'Q2FzcmlvbiDigJQgb3JpZ2luYWwgd29yayBvZiBEeWVuIMK3IG1keWVuYXNpZkBnbWFpbC5jb20gwrcgZXN0LiAyMDI2';
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'casrion', privileges: { secure: true, supportFetchAPI: true, bypassCSP: true, corsEnabled: true, stream: true } }
+]);
+
+let mainWindow;
+let overlayWindow;
+let helpOverlayWindow;
+let quickInputWindow;
+let tray;
+
+// ─── Application State ───────────────────────────────────────
+let activeFilePath = null;
+let insertionLine = -1; // -1 means end of file
+let settings = {};
+let undoStack = []; // stores { filePath, content, insertionLine } snapshots
+let redoStack = []; // undone snapshots, cleared by any fresh change
+let isRecording = false;
+const MAX_UNDO = 50;
+
+const settingsPath = path.join(app.getPath('userData'), 'casrion-settings.json');
+
+// ─── Undo History ──────────────────────────────────────────
+
+// Snapshots are whole-file copies, so very large notes could pin a lot of
+// memory across 50 entries — bound the total bytes too, oldest dropped first.
+const MAX_UNDO_BYTES = 10 * 1024 * 1024;
+
+function capSnapshotStack(stack) {
+  if (stack.length > MAX_UNDO) stack.shift();
+  let bytes = stack.reduce((n, s) => n + s.content.length, 0);
+  while (bytes > MAX_UNDO_BYTES && stack.length > 1) {
+    bytes -= stack.shift().content.length;
+  }
+}
+
+function pushUndo() {
+  if (!activeFilePath) return;
+  const content = readFileContent(activeFilePath);
+  undoStack.push({ filePath: activeFilePath, content, insertionLine });
+  capSnapshotStack(undoStack);
+  // A fresh change forks history; the undone branch can no longer be redone
+  redoStack = [];
+}
+
+function performUndo() {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return;
+  }
+  // Snapshots are tagged with the file they came from; only undo changes
+  // that belong to the currently active file so we never write one note's
+  // content into another.
+  const top = undoStack[undoStack.length - 1];
+  if (!top || top.filePath !== activeFilePath) {
+    showOverlayNotification('Nothing to undo for this note', 'error');
+    return;
+  }
+  undoStack.pop();
+  // Remember what the note looked like right now, so redo can bring it back
+  redoStack.push({ filePath: activeFilePath, content: readFileContent(activeFilePath), insertionLine });
+  capSnapshotStack(redoStack);
+  showOverlayNotification('Undo complete', 'text');
+  fs.writeFileSync(top.filePath, top.content, 'utf-8');
+  insertionLine = top.insertionLine;
+  // The undone capture may have carried a source stamp — forget the dedupe
+  // state so the next capture stamps again instead of assuming one exists.
+  lastStamp = { title: null, file: null };
+  console.log('[Casrion] Undo performed, stack size:', undoStack.length);
+  notifyRendererFileUpdated();
+}
+
+function performRedo() {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return;
+  }
+  const top = redoStack[redoStack.length - 1];
+  if (!top || top.filePath !== activeFilePath) {
+    showOverlayNotification('Nothing to redo for this note', 'error');
+    return;
+  }
+  redoStack.pop();
+  // Push the pre-redo state manually: pushUndo() would wipe the redo branch
+  undoStack.push({ filePath: activeFilePath, content: readFileContent(activeFilePath), insertionLine });
+  capSnapshotStack(undoStack);
+  showOverlayNotification('Redo complete', 'text');
+  fs.writeFileSync(top.filePath, top.content, 'utf-8');
+  insertionLine = top.insertionLine;
+  lastStamp = { title: null, file: null };
+  console.log('[Casrion] Redo performed, stack size:', redoStack.length);
+  notifyRendererFileUpdated();
+}
+
+// ─── Settings Persistence ─────────────────────────────────
+function loadSettings() {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      // Strip a UTF-8 BOM if present (external editors/tools may add one)
+      const raw = fs.readFileSync(settingsPath, 'utf-8').replace(/^﻿/, '');
+      settings = JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('[Casrion] Failed to load settings:', e.message);
+    settings = {};
+  }
+  
+  // Migrate old workingFolder string to array
+  if (settings.workingFolder && !settings.workingFolders) {
+    settings.workingFolders = [settings.workingFolder];
+    delete settings.workingFolder;
+  }
+  if (!settings.workingFolders) {
+    settings.workingFolders = [];
+  }
+  
+  return settings;
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  } catch (e) {
+    console.error('[Casrion] Failed to save settings:', e.message);
+  }
+}
+
+// ─── File Operations ───────────────────────────────────────
+
+function buildWorkspace() {
+  if (!settings.workingFolders) settings.workingFolders = [];
+
+  // Show only folders that exist right now, but do NOT delete missing ones
+  // from settings — a folder on a USB/network drive must survive a temporary
+  // disconnect and reappear when the drive comes back. Explicit removal
+  // happens only through the remove-folder handler.
+  const validFolders = settings.workingFolders.filter(folder => {
+    try { return fs.existsSync(folder); } catch { return false; }
+  });
+
+  return validFolders.map(folder => {
+    return {
+      folderPath: folder,
+      folderName: folder.split(/[/\\]/).pop(),
+      files: listMdFiles(folder)
+    };
+  });
+}
+function listMdFiles(folderPath) {
+  try {
+    if (!folderPath || !fs.existsSync(folderPath)) return [];
+    const files = fs.readdirSync(folderPath)
+      .filter(f => f.toLowerCase().endsWith('.md'))
+      .map(f => {
+        const fullPath = path.join(folderPath, f);
+        let stat;
+        try { stat = fs.statSync(fullPath); } catch { return null; }
+        return {
+          name: f.replace(/\.md$/i, ''),
+          filename: f,
+          path: fullPath,
+          size: stat.size,
+          modified: stat.mtimeMs
+        };
+      })
+      .filter(Boolean)
+      // Stable alphabetical order — mtime sorting made the list reshuffle on every capture
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    return files;
+  } catch (e) {
+    console.error('[Casrion] Failed to list files:', e.message);
+    return [];
+  }
+}
+
+function readFileContent(filePath) {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, 'utf-8');
+
+      // Normalize CRLF so line-based insertion math is consistent
+      // (files edited externally in Notepad etc. arrive with \r\n)
+      content = content.replace(/\r\n?/g, '\n');
+
+      // Auto-migrate legacy absolute paths to the new relative pathing system
+      const originalContent = content;
+      // Handle both Markdown format and HTML src format (for file:/// and
+      // casrion://). The optional third slash also catches hydrated
+      // "casrion://C:/..." URLs that an older editor build saved to disk.
+      content = content.replace(/\]\((?:file|casrion):\/\/\/?[^)]+\/assets\/([^)]+)\)/g, '](assets/$1)');
+      content = content.replace(/src="(?:file|casrion):\/\/\/?[^"]+\/assets\/([^"]+)"/g, 'src="assets/$1"');
+
+      // Heal source stamps that an older editor build flattened into plain
+      // text ("Source: title · [url](url) · 12:05 am" on its own line):
+      // rewrap them so they become hidden metadata again instead of clutter.
+      content = content.replace(/^Source:\s?(\S.*·\s*\d{1,2}:\d{2}\s?[ap]m)\s*$/gim, (line, body) => {
+        let b = body.replace(/\[([^\]]*)\]\(([^)]*)\)/g, '$1');   // unwrap markdown links
+        b = b.replace(/\\([\\`*_{}[\]()#+\-.!>~|])/g, '$1');       // undo turndown escapes
+        b = b.replace(/&(?!(?:amp|lt|gt|quot|#\d+);)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<sub>Source: ${b.trim()}</sub>`;
+      });
+
+      // Heal list markers an older editor build escaped into plain text
+      // ("\- item" lines): those came from lists that sat directly under a
+      // stamp or memo line and got flattened by the markdown round trip.
+      content = content.replace(/^\\(?=[-*] )/gm, '');
+
+      // Heal LaTeX whose backslashes a capture build doubled ("\\frac"):
+      // KaTeX reads "\\" as a line break, so a doubled command rendered as its
+      // plain letters ("frac"). Only inside math spans, and only a doubled
+      // backslash that begins a command word, so real "\\" line breaks (which
+      // are followed by whitespace/braces/end) are left untouched.
+      content = content.replace(
+        /\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g,
+        (span) => span.replace(/\\\\(?=[A-Za-z])/g, '\\')
+      );
+
+      if (content !== originalContent) {
+        fs.writeFileSync(filePath, content, 'utf-8');
+        console.log(`[Casrion] Auto-migrated legacy paths in ${filePath}`);
+      }
+      
+      return content;
+    }
+  } catch (e) {
+    console.error('[Casrion] Failed to read file:', e.message);
+  }
+  return '';
+}
+
+function getLines() {
+  if (!activeFilePath) return [];
+  const content = readFileContent(activeFilePath);
+  return content.split('\n');
+}
+
+// Append text to the END of an existing line (same paragraph continuation)
+function appendToLine(text, lineNum) {
+  if (!activeFilePath) return -1;
+  const lines = getLines();
+
+  // Split multiline text into an array of lines
+  const textLines = text.split(/\r?\n/);
+  const firstTextLine = textLines[0] || '';
+  const restTextLines = textLines.slice(1);
+
+  // Smart checking: if current line is a heading, list, blockquote, image,
+  // source stamp, voice memo or other HTML block, auto-push to new line.
+  // Stamps especially must stay alone on their line — text glued onto one
+  // stops the viewer from hiding it.
+  const smartRegex = /^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?|!\[|<sub|<audio|<\/?div)/;
+
+  if (lineNum >= 0 && lineNum < lines.length && smartRegex.test(lines[lineNum])) {
+    // Current line is a structural block. Insert below it with one blank
+    // separator: without it, markdown reads plain text under a list or
+    // quote line as a lazy continuation and merges it into that block.
+    lines.splice(lineNum + 1, 0, '', ...textLines);
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lineNum + 1 + textLines.length;
+  }
+
+  if (lineNum < 0 || lineNum >= lines.length) {
+    // Append at end of file
+    const currentLast = lines.length - 1;
+    if (lines[currentLast] && lines[currentLast].trim() !== '') {
+      // Last line has content, append to it (check if it's structural too)
+      if (smartRegex.test(lines[currentLast])) {
+        lines.push('', ...textLines);
+        fs.writeFileSync(activeFilePath, lines.join('\n'));
+        return lines.length - 1;
+      } else {
+        lines[currentLast] = lines[currentLast] + ' ' + firstTextLine;
+        if (restTextLines.length > 0) {
+          lines.push(...restTextLines);
+        }
+        fs.writeFileSync(activeFilePath, lines.join('\n'));
+        return lines.length - 1;
+      }
+    } else {
+      // Last line is empty, put text there
+      lines.splice(currentLast, 1, ...textLines);
+      fs.writeFileSync(activeFilePath, lines.join('\n'));
+      return currentLast + textLines.length - 1;
+    }
+  } else {
+    // Append to the specified line
+    if (lines[lineNum].trim() === '') {
+      lines[lineNum] = firstTextLine;
+    } else {
+      lines[lineNum] = lines[lineNum] + ' ' + firstTextLine;
+    }
+    if (restTextLines.length > 0) {
+      lines.splice(lineNum + 1, 0, ...restTextLines);
+    }
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lineNum + restTextLines.length;
+  }
+}
+
+// Insert a NEW line after the insertion point (for headings, images, new paragraphs).
+// Blank-aware: reuses empty lines already at the target instead of stacking more,
+// so repeated Ctrl+Shift+N presses or blank-line targets never inflate spacing.
+function insertNewLineAfter(text, lineNum) {
+  if (!activeFilePath) return -1;
+  const lines = getLines();
+  const textLines = text.split(/\r?\n/);
+
+  if (lineNum < 0 || lineNum >= lines.length) {
+    // Append at end. Collapse a run of trailing blank lines down to one
+    // separator instead of adding another on top of them.
+    while (lines.length > 1 && lines[lines.length - 1].trim() === '' && lines[lines.length - 2].trim() === '') {
+      lines.pop();
+    }
+    if (lines.length === 1 && lines[0].trim() === '') {
+      // Empty note: start writing from the top, no leading blank line
+      lines.splice(0, 1, ...textLines);
+    } else if (lines[lines.length - 1].trim() === '') {
+      lines.push(...textLines);
+    } else {
+      lines.push('', ...textLines);
+    }
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lines.length - 1;
+  }
+
+  if (lines[lineNum].trim() === '') {
+    // The insertion point is already an empty line (e.g. right after
+    // Ctrl+Shift+N): write into it, keeping one separator from text above.
+    const sep = lineNum > 0 && lines[lineNum - 1].trim() !== '' ? [''] : [];
+    lines.splice(lineNum, 1, ...sep, ...textLines);
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lineNum + sep.length + textLines.length - 1;
+  }
+
+  // Insert after the specified line with one separating blank line
+  lines.splice(lineNum + 1, 0, '', ...textLines);
+  fs.writeFileSync(activeFilePath, lines.join('\n'));
+  return lineNum + 1 + textLines.length; // the new line's index
+}
+
+// Insert a blank line (for Alt+N new paragraph)
+function insertBlankLine(lineNum) {
+  if (!activeFilePath) return -1;
+  const lines = getLines();
+
+  if (lineNum < 0 || lineNum >= lines.length) {
+    lines.push('');
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lines.length - 1;
+  } else {
+    lines.splice(lineNum + 1, 0, '');
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    return lineNum + 1;
+  }
+}
+
+// Single source of truth for everything the renderer needs to display.
+// Content is ALWAYS hydrated here — returning raw relative asset paths was
+// the reason screenshots disappeared after re-adding a moved folder.
+function buildStatePayload() {
+  const content = activeFilePath
+    ? hydrateContentForRenderer(readFileContent(activeFilePath), activeFilePath)
+    : '';
+  return {
+    workspace: buildWorkspace(),
+    activeFilePath,
+    filePath: activeFilePath,
+    content,
+    insertionLine,
+    stampSource: !!settings.stampSource
+  };
+}
+
+function notifyRendererFileUpdated() {
+  if (mainWindow && !mainWindow.isDestroyed() && activeFilePath) {
+    mainWindow.webContents.send('file-updated', buildStatePayload());
+  }
+}
+
+function showOverlayNotification(message, type = 'text', duration = 2000) {
+  // The toast window can die with a GPU/renderer crash — rebuild it on
+  // demand so on-screen feedback never silently disappears for the session.
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    createOverlayWindow();
+    overlayWindow.webContents.once('did-finish-load', () => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        if (!overlayWindow.isVisible()) overlayWindow.showInactive();
+        overlayWindow.webContents.send('show-notification', { message, type, duration });
+      }
+    });
+    return;
+  }
+  if (!overlayWindow.isVisible()) overlayWindow.showInactive();
+  overlayWindow.webContents.send('show-notification', { message, type, duration });
+}
+
+// ─── Window & Tray ─────────────────────────────────────────
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1100,
+    height: 750,
+    minWidth: 700,
+    minHeight: 500,
+    icon: process.platform === 'win32'
+      ? path.join(__dirname, 'icons', 'app.ico')
+      : path.join(__dirname, 'icons', 'icon_256.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      // Full speed while visible; the hide/show handlers below re-enable
+      // throttling whenever the window sits in the tray (except while the
+      // recorder, which lives in this window, is running).
+      backgroundThrottling: false
+    },
+    autoHideMenuBar: true,
+    title: 'Casrion',
+    backgroundColor: '#110e0d',
+    // Desktop-app chrome: the renderer's slim header doubles as the title
+    // bar (drag region in CSS) and Windows draws its own minimize/maximize/
+    // close controls on top of it.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#e6dbc5', symbolColor: '#5f5344', height: 40 },
+    show: false
+  });
+
+  const isDev = process.env.NODE_ENV === 'development';
+  console.log('[Casrion] NODE_ENV:', process.env.NODE_ENV, '| isDev:', isDev);
+
+  if (isDev) {
+    // dev.cjs passes the real Vite URL (the port shifts to 5174+ when 5173 is
+    // already taken by a leftover instance, which used to leave this window
+    // pointing at a dead port — a blank screen).
+    const devUrl = process.env.CASRION_DEV_URL || 'http://localhost:5173';
+    let devRetries = 0;
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, _url, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3 /* ERR_ABORTED: normal during reloads */) return;
+      if (devRetries++ < 60) {
+        console.log(`[Casrion] Dev server not ready (${errorDesc}), retry ${devRetries}...`);
+        setTimeout(() => {
+          if (!mainWindow.isDestroyed()) mainWindow.loadURL(devUrl);
+        }, 500);
+      } else {
+        console.error('[Casrion] Gave up waiting for dev server at', devUrl);
+      }
+    });
+    mainWindow.loadURL(devUrl);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
+
+  // Links inside notes must never navigate the app itself (that shows a
+  // dead page until restart) and must never open child app windows. Send
+  // web links to the user's default browser instead.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url === mainWindow.webContents.getURL()) return; // reloads are fine
+    event.preventDefault();
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    console.log('[Casrion] Window shown');
+  });
+
+  mainWindow.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+      // First time only: tell the user where the app went — the tray icon
+      // often lands in the hidden overflow area and is easy to miss.
+      if (!settings.trayNoticeShown) {
+        settings.trayNoticeShown = true;
+        saveSettings();
+        showOverlayNotification('Casrion is minimized to the system tray', 'text', 5000);
+      }
+    }
+  });
+
+  // Parked in the tray the renderer needs no frames or fast timers — let
+  // Chromium throttle it to near-idle so a hidden Casrion costs as little
+  // as possible. Hotkey captures are unaffected (they run in this process
+  // and only send the renderer an update it applies on next wake). The one
+  // exception is voice recording, which runs inside that renderer.
+  mainWindow.on('hide', () => {
+    if (!isRecording) mainWindow.webContents.setBackgroundThrottling(true);
+  });
+  mainWindow.on('show', () => {
+    mainWindow.webContents.setBackgroundThrottling(false);
+  });
+
+  // A crashed renderer would otherwise leave a dead blank window (and a dead
+  // recorder) for the rest of the session — reload it instead.
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason !== 'clean-exit') {
+      console.error('[Casrion] Renderer gone (' + details.reason + '), reloading');
+      isRecording = false;
+      mainWindow.webContents.reload();
+    }
+  });
+}
+
+function createOverlayWindow() {
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  overlayWindow = new BrowserWindow({
+    // Wide enough for full toast messages — the pill itself auto-sizes,
+    // the rest of the window is invisible and click-through.
+    width: 640,
+    height: 100,
+    x: Math.floor(width / 2 - 320), // Center horizontally
+    y: height - 120, // Bottom placement
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      // Never throttle: the overlay is usually occluded by other windows,
+      // and throttled rendering freezes the toast fade-in at opacity 0.
+      backgroundThrottling: false
+    }
+  });
+
+  // Make it fully click-through
+  overlayWindow.setIgnoreMouseEvents(true);
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));
+}
+
+function createHelpOverlay() {
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  helpOverlayWindow = new BrowserWindow({
+    width: 480,
+    height: 580,
+    x: Math.floor(width / 2 - 240),
+    y: Math.floor(height / 2 - 290),
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      // Static content, no timers or animations — fine to throttle while
+      // it waits hidden, which keeps the idle footprint down.
+      backgroundThrottling: true
+    }
+  });
+
+  helpOverlayWindow.loadFile(path.join(__dirname, 'help-overlay.html'));
+
+  // Clicking anywhere outside the overlay (another window, the desktop)
+  // steals focus from it, and losing focus dismisses it.
+  helpOverlayWindow.on('blur', () => {
+    if (helpOverlayWindow && !helpOverlayWindow.isDestroyed() && helpOverlayWindow.isVisible()) {
+      helpOverlayWindow.hide();
+    }
+  });
+}
+
+// Quick note popup: type into the active note from anywhere, without
+// bringing up the main window. Pre-created hidden so it opens instantly.
+function createQuickInputWindow() {
+  quickInputWindow = new BrowserWindow({
+    width: 600,
+    height: 210,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      backgroundThrottling: false
+    }
+  });
+  quickInputWindow.setAlwaysOnTop(true, 'screen-saver');
+  quickInputWindow.loadFile(path.join(__dirname, 'quick-input.html'));
+
+  // Clicking anywhere else cancels; the typed draft is kept for next time
+  quickInputWindow.on('blur', () => {
+    if (quickInputWindow && !quickInputWindow.isDestroyed() && quickInputWindow.isVisible()) {
+      quickInputWindow.hide();
+    }
+  });
+}
+
+function showQuickInputPopup() {
+  // Open on whichever monitor the user is working on
+  const { screen } = require('electron');
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const wa = display.workArea;
+  quickInputWindow.setPosition(
+    Math.round(wa.x + wa.width / 2 - 300),
+    Math.round(wa.y + wa.height * 0.22)
+  );
+  quickInputWindow.webContents.send('quick-input-context', {
+    fileName: activeFilePath ? path.basename(activeFilePath) : null
+  });
+  quickInputWindow.show();
+  quickInputWindow.focus();
+}
+
+function toggleQuickInput() {
+  // Normally pre-created shortly after launch; if the hotkey wins that race,
+  // build it now and pop it up as soon as its page is ready.
+  if (!quickInputWindow || quickInputWindow.isDestroyed()) {
+    createQuickInputWindow();
+    quickInputWindow.webContents.once('did-finish-load', () => {
+      if (quickInputWindow && !quickInputWindow.isDestroyed()) showQuickInputPopup();
+    });
+    return;
+  }
+  if (quickInputWindow.isVisible()) {
+    quickInputWindow.hide();
+    return;
+  }
+  showQuickInputPopup();
+}
+
+// Typed drafts can mix block types in one go (a heading, some text, then a
+// quote). Blank lines between different block kinds keep each one rendering
+// as its own block instead of merging into the previous paragraph.
+function spaceAuthoredBlocks(lines) {
+  const kindOf = (l) => {
+    const t = l.trim();
+    if (!t) return 'blank';
+    if (/^#{1,6}\s/.test(t)) return 'heading';
+    if (/^([-*]|\d+\.)\s/.test(t)) return 'list';
+    if (/^>\s?/.test(t)) return 'quote';
+    return 'text';
+  };
+  const out = [];
+  let prev = 'blank';
+  for (const line of lines) {
+    const kind = kindOf(line);
+    if (kind === 'blank') { out.push(line); prev = 'blank'; continue; }
+    // Every heading starts a new block, even after another heading
+    if (prev !== 'blank' && (kind !== prev || kind === 'heading')) out.push('');
+    out.push(line);
+    prev = kind;
+  }
+  return out.join('\n');
+}
+
+// Insert text the user typed in the quick popup. Unlike clipboard captures
+// this is deliberate authored content — no normalization, just placement.
+function insertTypedText(rawText, mode) {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return;
+  }
+  const text = String(rawText || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+  if (!text.trim()) return;
+
+  pushUndo();
+  // A quick note is the user's own writing: if it lands under an earlier
+  // source stamp it must not be attributed to that source.
+  ensureStampBoundary();
+  const lines = text.split('\n');
+  let notifType = 'text';
+  // Markdown the user typed themselves ("# Heading", "- item", "> quote")
+  const authoredMarkdown = /^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?|!\[|```)/;
+
+  if (mode === 'h1' || mode === 'h2' || mode === 'h3') {
+    const prefix = mode === 'h1' ? '# ' : mode === 'h2' ? '## ' : '### ';
+    insertionLine = insertNewLineAfter(lines.map((l) => (l.trim() ? prefix + l.trim() : l)).join('\n'), insertionLine);
+    notifType = 'heading';
+  } else if (mode === 'bullet') {
+    insertionLine = insertNewLineAfter(lines.map((l) => (l.trim() ? '- ' + l.trim() : l)).join('\n'), insertionLine);
+  } else if (mode === 'quote') {
+    insertionLine = insertNewLineAfter(lines.map((l) => '> ' + l).join('\n'), insertionLine);
+  } else if (lines.length > 1 || authoredMarkdown.test(text.trim())) {
+    // Multi-line drafts and hand-written markdown get their own lines;
+    // appendToLine would glue them onto the current line as one run-on.
+    insertionLine = insertNewLineAfter(spaceAuthoredBlocks(lines), insertionLine);
+  } else {
+    insertionLine = appendToLine(text, insertionLine);
+  }
+
+  const firstLine = lines[0];
+  showOverlayNotification(firstLine.substring(0, 30) + (firstLine.length > 30 || lines.length > 1 ? '...' : ''), notifType);
+  notifyRendererFileUpdated();
+}
+
+function setStampSource(enabled) {
+  settings.stampSource = !!enabled;
+  saveSettings();
+  if (settings.stampSource) { startTitleHelper(); getForegroundSourceInfo(5000); } else { stopTitleHelper(); }
+  lastStamp = { title: null, file: null };
+  refreshTrayMenu();
+  // The tray and the window paperclip both toggle this — push the new state
+  // to the renderer so the two can never show different answers.
+  notifyRendererFileUpdated();
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Open Casrion', click: () => { mainWindow.show(); mainWindow.focus(); } },
+    { type: 'separator' },
+    {
+      label: 'Add source to captures',
+      type: 'checkbox',
+      checked: !!settings.stampSource,
+      click: (item) => setStampSource(item.checked)
+    },
+    {
+      label: 'Explain selection (double-tap Ctrl)',
+      type: 'checkbox',
+      checked: settings.explainEnabled !== false,
+      click: (item) => explainFeature.setEnabled(item.checked)
+    },
+    { type: 'separator' },
+    { label: 'Quit Casrion', click: () => quitApp() }
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+function createTray() {
+  // On Windows a multi-size .ico lets the shell pick the right resolution
+  // for the current DPI scale — a pre-resized 16px PNG looks blurry at 150%+.
+  // tray.ico is the logo cropped to its visible bounds, so the mark fills
+  // the tiny tray slot instead of floating in transparent padding.
+  if (process.platform === 'win32') {
+    tray = new Tray(path.join(__dirname, 'icons', 'tray.ico'));
+  } else {
+    const icon = nativeImage.createFromPath(path.join(__dirname, 'icons', 'icon_32.png'));
+    tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  }
+  tray.setToolTip('Casrion');
+  refreshTrayMenu();
+  tray.on('click', () => { mainWindow.show(); mainWindow.focus(); });
+}
+
+// ─── Source stamps (opt-in): who/where a capture came from ────
+// A persistent PowerShell helper reads the foreground window title, owning
+// app, and (for browsers) the address bar URL on demand (Electron has no API
+// for other apps' windows). The address bar is read through Windows UI
+// Automation, which covers copies where the page puts no URL in the
+// clipboard (site "copy" buttons usually copy plain text only). Only runs
+// while the tray option "Add source to captures" is enabled.
+// Protocol: each request is an id line on stdin; the reply line echoes the
+// id followed by tab-separated fields, so late replies can never be matched
+// to the wrong request.
+
+const TITLE_HELPER_SCRIPT = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class FG {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int c);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+}
+"@
+$browsers = @{ chrome = 1; msedge = 1; brave = 1; firefox = 1; opera = 1; opera_gx = 1; vivaldi = 1; chromium = 1; arc = 1 }
+$editCache = @{}
+function Get-BrowserUrl($h, $procName) {
+  if (-not $browsers.ContainsKey($procName)) { return '' }
+  $key = $h.ToInt64()
+  for ($attempt = 0; $attempt -lt 2; $attempt++) {
+    try {
+      $edit = $editCache[$key]
+      if ($null -eq $edit) {
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle($h)
+        $condType = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+        $condVal = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::IsValuePatternAvailableProperty, $true)
+        $cond = New-Object System.Windows.Automation.AndCondition($condType, $condVal)
+        $edit = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+        if ($null -eq $edit) { return '' }
+        $editCache[$key] = $edit
+      }
+      $vp = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+      return [string]$vp.Current.Value
+    } catch {
+      $editCache.Remove($key)
+    }
+  }
+  return ''
+}
+$tab = [string][char]9
+while ($true) {
+  $reqId = [Console]::In.ReadLine()
+  if ($null -eq $reqId) { break }
+  $h = [FG]::GetForegroundWindow()
+  $sb = New-Object System.Text.StringBuilder 512
+  [void][FG]::GetWindowText($h, $sb, 512)
+  $title = $sb.ToString()
+  $procId = [uint32]0
+  [void][FG]::GetWindowThreadProcessId($h, [ref]$procId)
+  $procName = ''
+  $desc = ''
+  try {
+    $p = [System.Diagnostics.Process]::GetProcessById([int]$procId)
+    $procName = $p.ProcessName.ToLowerInvariant()
+    try { $desc = [string]$p.MainModule.FileVersionInfo.FileDescription } catch { $desc = '' }
+  } catch { }
+  $url = ''
+  try { $url = [string](Get-BrowserUrl $h $procName) } catch { $url = '' }
+  $clean = @()
+  foreach ($f in @($reqId.Trim(), $title, $procName, $desc, $url)) {
+    $clean += (([string]$f) -replace "[\\r\\n\\t]+", ' ')
+  }
+  [Console]::Out.WriteLine([string]::Join($tab, $clean))
+}
+`;
+
+let titleHelper = null;
+let titleHelperPending = new Map();
+let titleHelperSeq = 0;
+let lastStamp = { title: null, url: null, file: null };
+
+function startTitleHelper() {
+  if (titleHelper || process.platform !== 'win32') return;
+  try {
+    const encoded = Buffer.from(TITLE_HELPER_SCRIPT, 'utf16le').toString('base64');
+    titleHelper = spawn('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+      { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+    let buf = '';
+    titleHelper.stdout.on('data', (d) => {
+      buf += d.toString('utf8');
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).replace(/\r$/, '');
+        buf = buf.slice(i + 1);
+        const parts = line.split('\t');
+        const resolve = titleHelperPending.get(parts[0]);
+        if (resolve) {
+          titleHelperPending.delete(parts[0]);
+          resolve({ title: parts[1] || '', proc: parts[2] || '', app: parts[3] || '', url: parts[4] || '' });
+        }
+      }
+    });
+    titleHelper.on('exit', () => {
+      titleHelper = null;
+      for (const resolve of titleHelperPending.values()) resolve(null);
+      titleHelperPending.clear();
+    });
+  } catch (e) {
+    console.error('[Casrion] Title helper failed to start:', e.message);
+    titleHelper = null;
+  }
+}
+
+function stopTitleHelper() {
+  if (titleHelper) {
+    try { titleHelper.kill(); } catch { /* already gone */ }
+    titleHelper = null;
+  }
+  for (const resolve of titleHelperPending.values()) resolve(null);
+  titleHelperPending.clear();
+}
+
+// The first address bar lookup on a freshly opened browser window makes the
+// browser build its accessibility tree, which can take most of a second, so
+// the timeout is generous. Repeat lookups hit the helper's element cache and
+// come back in a few milliseconds.
+function getForegroundSourceInfo(timeoutMs = 1200, force = false) {
+  // Explain lookups need the helper even when source stamping is off
+  if (!settings.stampSource && !force) return Promise.resolve(null);
+  startTitleHelper();
+  if (!titleHelper) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const id = String(++titleHelperSeq);
+    const timer = setTimeout(() => {
+      titleHelperPending.delete(id);
+      resolve(null);
+    }, timeoutMs);
+    titleHelperPending.set(id, (info) => { clearTimeout(timer); resolve(info); });
+    try { titleHelper.stdin.write(id + '\n'); } catch {
+      clearTimeout(timer);
+      titleHelperPending.delete(id);
+      resolve(null);
+    }
+  });
+}
+
+function cleanSourceTitle(raw) {
+  if (!raw) return null;
+  let t = raw.trim();
+  // Strip browser name suffixes and profile decorations
+  for (let pass = 0; pass < 2; pass++) {
+    t = t.replace(/\s+[-—–]\s+(Google Chrome|Microsoft Edge|Mozilla Firefox|Firefox|Brave|Opera|Chromium|Vivaldi|Arc)(\s+\(.*\))?$/i, '');
+  }
+  t = t.replace(/^\(\d+\)\s*/, '').trim(); // "(3) " unread counters
+  // Never stamp our own windows (main window, help overlay, toasts)
+  if (!t || /^Casrion\b/.test(t)) return null;
+  return t.length > 90 ? t.slice(0, 90) + '…' : t;
+}
+
+// Browsers put the page address in the raw Windows clipboard HTML header
+// ("SourceURL: https://...") whenever formatted content is copied. That
+// gives the exact website for a capture with zero extra system access.
+function getClipboardSourceUrl() {
+  try {
+    const raw = clipboard.readBuffer('HTML Format');
+    if (!raw || raw.length === 0) return null;
+    const head = raw.toString('utf8', 0, Math.min(raw.length, 2048));
+    const m = /^SourceURL:(\S+)/im.exec(head);
+    if (!m) return null;
+    const url = m[1].trim().replace(/[<>"]/g, '');
+    if (!/^https?:\/\//i.test(url) || url.length > 400) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+// The browser address bar usually shows the page without its scheme
+// ("en.wikipedia.org/wiki/..."). Accept that shape, reject anything that
+// looks like a typed search, an internal page (chrome://...), or half-typed
+// input, so a stamp never carries a made-up address.
+function normalizeAddressBarUrl(raw) {
+  if (!raw) return null;
+  let u = String(raw).trim();
+  if (!u || u.length > 400 || /\s/.test(u)) return null;
+  if (!/^https?:\/\//i.test(u)) {
+    if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}([/:?#]|$)/i.test(u)) return null;
+    u = 'https://' + u;
+  }
+  return u.replace(/[<>"]/g, '');
+}
+
+// Friendly app name from the exe's version info ("Brave Browser", "Slack",
+// "ChatGPT"). Only stamped when there is no URL: a web address already says
+// where the capture came from, and the title often repeats the app anyway.
+function cleanAppName(info, title, url) {
+  if (!info || url) return null;
+  let name = (info.app || '').trim();
+  if (!name || /^casrion/i.test(name)) return null;
+  if (title && title.toLowerCase().includes(name.toLowerCase())) return null;
+  return name.length > 40 ? name.slice(0, 40) : name;
+}
+
+// Sample the capture's origin at the moment the hotkey fires by starting the
+// foreground-window lookup (async, never blocks the handler). The clipboard's
+// SourceURL header is deliberately NOT read here: reading the HTML clipboard
+// format forces the source app to render it on demand, which can block the
+// main process for seconds on large copies. It is read later, behind the toast.
+function beginSourceStamp() {
+  if (!settings.stampSource) return null;
+  return { infoPromise: getForegroundSourceInfo() };
+}
+
+// The viewer attributes every block to the nearest stamp above it, so
+// content added while stamping is OFF would silently inherit the last old
+// stamp's source. Close that region once with an empty stamp (hidden in the
+// viewer) so unstamped captures stay unattributed. Pure in-memory line scan:
+// costs well under a millisecond and never touches the helper process.
+function ensureStampBoundary() {
+  if (!activeFilePath) return;
+  const lines = getLines();
+  const start = insertionLine >= 0 && insertionLine < lines.length ? insertionLine : lines.length - 1;
+  for (let i = start; i >= 0; i--) {
+    const m = /^<sub[^>]*>\s*(?:Source:\s*)?([\s\S]*?)<\/sub>/.exec(lines[i].trim());
+    if (m) {
+      if (m[1].trim()) {
+        insertionLine = insertNewLineAfter('<sub></sub>', insertionLine);
+        // The region is closed now; the next stamped capture must write a
+        // fresh stamp even if it comes from the same source as before.
+        lastStamp = { title: null, url: null, file: null };
+      }
+      return;
+    }
+  }
+}
+
+// Insert a small source line when the capture source changes (never repeats
+// the same source back-to-back, so notes stay clean).
+async function maybeStampSource(pending) {
+  if (!activeFilePath) return;
+  if (!settings.stampSource) { ensureStampBoundary(); return; }
+  const sample = pending || beginSourceStamp();
+  // The clipboard's own SourceURL is the page the text was copied from, so
+  // it wins over the address bar (which is merely the page in front now).
+  // Read it here, after the toast is on screen: forcing the HTML clipboard
+  // format to render can block for a long time on large copies.
+  const clipUrl = getClipboardSourceUrl();
+  const info = await sample.infoPromise;
+  const title = cleanSourceTitle(info && info.title);
+  const url = clipUrl || normalizeAddressBarUrl(info && info.url);
+  const appName = cleanAppName(info, title, url);
+  if (!title && !url && !appName) return;
+  if (lastStamp.title === title && lastStamp.url === url && lastStamp.file === activeFilePath) return;
+  lastStamp = { title, url, file: activeFilePath };
+  const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const esc = (s) => s.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const parts = [];
+  if (title) parts.push(esc(title));
+  if (url) parts.push(esc(url));
+  if (appName) parts.push(esc(appName));
+  parts.push(time);
+  insertionLine = insertNewLineAfter(`<sub>Source: ${parts.join(' · ')}</sub>`, insertionLine);
+}
+
+// ─── Clipboard Capture (reads clipboard directly — no simulation) ──
+
+// Formatting wrappers act on the plain snippet as-is (intentional inline emphasis)
+const WRAPPER_MODES = {
+  bold: (t) => `**${t}**`,
+  italic: (t) => `*${t}*`,
+  red: (t) => `<span style="color: #ef4444">${t}</span>`,
+  green: (t) => `<span style="color: #10b981">${t}</span>`,
+  blue: (t) => `<span style="color: #3b82f6">${t}</span>`
+};
+
+// Guards, clipboard sniff and the confirmation toast. Runs synchronously in
+// the hotkey handler itself, so the toast appears the instant the key goes
+// down even when the capture chain is still busy committing earlier work.
+// Only cheap clipboard calls here: availableFormats never renders anything,
+// and plain text renders fast. The HTML flavor (which the source app builds
+// on demand, sometimes over seconds) is read later, behind the toast.
+function preflightText(mode) {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return null;
+  }
+  const formats = clipboard.availableFormats();
+  const hasHtml = formats.includes('text/html');
+  const rawText = clipboard.readText();
+
+  if (WRAPPER_MODES[mode]) {
+    // Drop any color the snippet already carries so Alt+R/G/B always applies
+    // a single clean color instead of nesting inside an old one.
+    const snippet = stripColorMarkup((rawText || '').trim()).trim();
+    if (!snippet) {
+      showOverlayNotification('Copy plain text first for formatting captures', 'error');
+      return null;
+    }
+    showOverlayNotification(snippet.substring(0, 30) + (snippet.length > 30 ? '...' : ''), 'text');
+    return { rawText, hasHtml, snippet };
+  }
+
+  if ((!rawText || rawText.trim().length === 0) && !hasHtml) {
+    showOverlayNotification('Clipboard is empty. Copy text first (Ctrl+C)', 'error');
+    return null;
+  }
+  const previewLine = (rawText || '').trim().split('\n')[0];
+  showOverlayNotification(
+    previewLine
+      ? previewLine.substring(0, 30) + (previewLine.length > 30 || (rawText || '').trim().includes('\n') ? '...' : '')
+      : 'Captured',
+    mode === 'append' ? 'text' : 'heading'
+  );
+  return { rawText, hasHtml };
+}
+
+async function captureText(mode = 'append', pendingStamp = null, pre = null) {
+  const p = pre || preflightText(mode);
+  if (!p) return;
+
+  if (WRAPPER_MODES[mode]) {
+    pushUndo();
+    insertionLine = appendToLine(WRAPPER_MODES[mode](p.snippet), insertionLine);
+    console.log('[Casrion] Captured (' + mode + ') at line', insertionLine);
+    notifyRendererFileUpdated();
+    return;
+  }
+
+  // Append/heading captures go through normalization: AI-chat copies, KaTeX
+  // math, spreadsheet tables and glued text all become clean markdown.
+  const rawHtml = p.hasHtml ? clipboard.readHTML() : '';
+  const { content, structured } = normalizeCapture(p.rawText, rawHtml);
+  if (!content) {
+    showOverlayNotification('Clipboard is empty. Copy text first (Ctrl+C)', 'error');
+    return;
+  }
+
+  pushUndo();
+  await maybeStampSource(pendingStamp);
+
+  if (mode === 'append') {
+    insertionLine = structured
+      ? insertNewLineAfter(content, insertionLine)
+      : appendToLine(content, insertionLine);
+  } else {
+    const prefix = mode === 'h1' ? '# ' : mode === 'h2' ? '## ' : '### ';
+    insertionLine = insertNewLineAfter(prefix + content, insertionLine);
+  }
+
+  console.log('[Casrion] Captured (' + mode + ') at line', insertionLine, ':', content.substring(0, 50));
+  notifyRendererFileUpdated();
+}
+
+// Sniff + toast for image captures, run in the hotkey handler. Decoding the
+// actual bitmap of a 4K screenshot takes real time; only the cheap format
+// list is consulted before the toast.
+function preflightImage() {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return null;
+  }
+  if (!clipboard.availableFormats().some((f) => f.startsWith('image/'))) {
+    showOverlayNotification('No image in clipboard. Take a screenshot first (Win+Shift+S)', 'error');
+    return null;
+  }
+  showOverlayNotification('Image Saved', 'image');
+  return {};
+}
+
+async function captureImage(pendingStamp = null, pre = null) {
+  const p = pre || preflightImage();
+  if (!p) return;
+  const image = clipboard.readImage();
+  if (!image.isEmpty()) {
+    pushUndo();
+    await maybeStampSource(pendingStamp);
+    const assetsDir = path.join(path.dirname(activeFilePath), 'assets');
+    let maxNum = 0;
+    if (fs.existsSync(assetsDir)) {
+      const files = fs.readdirSync(assetsDir);
+      for (const file of files) {
+        if (file.toLowerCase().endsWith('.png')) {
+          const num = parseInt(file.substring(0, file.length - 4), 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    } else {
+      fs.mkdirSync(assetsDir, { recursive: true });
+    }
+    const filename = `${maxNum + 1}.png`;
+    const imagePath = path.join(assetsDir, filename);
+    fs.writeFileSync(imagePath, image.toPNG());
+
+    const fileUrl = 'assets/' + filename;
+    insertionLine = insertNewLineAfter(`![Screenshot](${fileUrl})`, insertionLine);
+    console.log('[Casrion] Captured image:', filename, 'at line', insertionLine);
+    notifyRendererFileUpdated();
+  } else {
+    showOverlayNotification('No image in clipboard. Take a screenshot first (Win+Shift+S)', 'error');
+  }
+}
+
+function newParagraph() {
+  if (!activeFilePath) return;
+  const lines = getLines();
+  const idx = insertionLine < 0 || insertionLine >= lines.length ? lines.length - 1 : insertionLine;
+  const curBlank = lines[idx].trim() === '';
+  const prevBlank = idx === 0 || lines[idx - 1].trim() === '';
+
+  // Already parked on a fresh empty line: pressing the shortcut again must
+  // not stack more blank lines into the document.
+  if (curBlank && prevBlank) {
+    insertionLine = idx;
+    notifyRendererFileUpdated();
+    return;
+  }
+
+  pushUndo();
+  if (curBlank) {
+    // The current blank line becomes the separator; add only the target line
+    insertionLine = insertBlankLine(idx);
+  } else {
+    // One blank line separates paragraphs, the second is where text lands
+    insertionLine = insertBlankLine(insertBlankLine(idx));
+  }
+  console.log('[Casrion] New paragraph at line', insertionLine);
+  notifyRendererFileUpdated();
+}
+
+// Guard + toast for code captures, run in the hotkey handler.
+function preflightCode() {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return null;
+  }
+  const text = clipboard.readText();
+  if (!text || text.trim().length === 0) {
+    showOverlayNotification('Clipboard is empty. Copy code first (Ctrl+C)', 'error');
+    return null;
+  }
+  showOverlayNotification('Code Block Added', 'code');
+  return { text };
+}
+
+async function captureCodeBlock(pendingStamp = null, pre = null) {
+  const p = pre || preflightCode();
+  if (!p) return;
+  pushUndo();
+  await maybeStampSource(pendingStamp);
+  const codeBlock = '```\n' + p.text + '\n```';
+  const lines = getLines();
+  const lineNum = insertionLine;
+
+  if (lineNum < 0 || lineNum >= lines.length) {
+    const codeLines = codeBlock.split('\n');
+    lines.push('', ...codeLines);
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    insertionLine = lines.length - 1;
+  } else {
+    const codeLines = codeBlock.split('\n');
+    lines.splice(lineNum + 1, 0, '', ...codeLines);
+    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    insertionLine = lineNum + 1 + codeLines.length;
+  }
+
+  console.log('[Casrion] Code block added at line', insertionLine);
+  notifyRendererFileUpdated();
+}
+
+function toggleHelpOverlay() {
+  // Normally pre-created shortly after launch; if the hotkey wins that race,
+  // build it now and show it as soon as its page is ready.
+  if (!helpOverlayWindow || helpOverlayWindow.isDestroyed()) {
+    createHelpOverlay();
+    helpOverlayWindow.once('ready-to-show', () => {
+      if (helpOverlayWindow && !helpOverlayWindow.isDestroyed()) helpOverlayWindow.show();
+    });
+    return;
+  }
+  if (helpOverlayWindow.isVisible()) {
+    helpOverlayWindow.hide();
+  } else {
+    helpOverlayWindow.show();
+  }
+}
+
+// ─── Voice Recording ───────────────────────────────────────
+function toggleRecording() {
+  if (!activeFilePath) {
+    showOverlayNotification('No file selected!', 'error');
+    return;
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    showOverlayNotification('App window unavailable. Cannot record', 'error');
+    isRecording = false;
+    return;
+  }
+
+  isRecording = !isRecording;
+  if (isRecording) {
+    console.log('[Casrion] Starting voice recording...');
+    // The recorder lives in the (possibly hidden and throttled) main window
+    // renderer — wake it to full speed for the duration of the recording.
+    mainWindow.webContents.setBackgroundThrottling(false);
+    mainWindow.webContents.send('start-recording');
+    showOverlayNotification('Recording... (Press Ctrl+Shift+M to stop)', 'mic', 0);
+  } else {
+    console.log('[Casrion] Stopping voice recording...');
+    mainWindow.webContents.send('stop-recording');
+  }
+}
+
+// Recording ended (saved or failed): if the window is parked in the tray,
+// hand the renderer back to Chromium's throttler.
+function rethrottleAfterRecording() {
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    mainWindow.webContents.setBackgroundThrottling(true);
+  }
+}
+
+// Quitting mid-recording: stop the recorder and give it a moment to hand the
+// audio over, so the memo lands in the note instead of vanishing.
+let recordingFlush = null;
+function resolveRecordingFlush() {
+  if (recordingFlush) {
+    const done = recordingFlush;
+    recordingFlush = null;
+    done();
+  }
+}
+
+function quitApp() {
+  app.isQuiting = true;
+  if (isRecording && mainWindow && !mainWindow.isDestroyed()) {
+    isRecording = false;
+    const flushed = new Promise((resolve) => {
+      recordingFlush = resolve;
+      setTimeout(resolve, 3000); // never hang the quit on a stuck recorder
+    });
+    mainWindow.webContents.send('stop-recording');
+    flushed.then(() => app.quit());
+    return;
+  }
+  app.quit();
+}
+
+// ─── Shortcuts ─────────────────────────────────────────────
+
+// Captures are async (source stamping awaits the title helper), so rapid
+// hotkey presses could interleave mid-file-write. Chain them so each capture
+// fully lands before the next starts.
+let captureChain = Promise.resolve();
+function enqueueCapture(fn) {
+  captureChain = captureChain
+    .then(fn)
+    .catch((e) => {
+      // A capture that threw (folder unplugged, file locked, disk full) must
+      // not fail silently after its toast already implied it worked.
+      console.error('[Casrion] Capture failed:', e);
+      showOverlayNotification('Could not save that capture. Check the note folder is still available', 'error', 4000);
+    });
+}
+
+function registerShortcuts() {
+  // Every capture splits in two: a synchronous preflight (guards, cheap
+  // clipboard sniff, TOAST) that runs right here in the handler, and the
+  // committed work that joins the capture queue. The toast therefore fires
+  // the instant the key goes down, even if an earlier capture is still
+  // finishing its source lookup or a heavy normalization in the queue.
+  // Stamped captures also start the foreground-window lookup at key-down so
+  // the slow part overlaps with whatever is still committing.
+  const textCapture = (mode) => () => {
+    const pre = preflightText(mode);
+    if (!pre) return;
+    const s = beginSourceStamp();
+    enqueueCapture(() => captureText(mode, s, pre));
+  };
+  const plainText = (mode) => () => {
+    const pre = preflightText(mode);
+    if (!pre) return;
+    enqueueCapture(() => captureText(mode, null, pre));
+  };
+  const shortcuts = {
+    'Ctrl+Shift+C': textCapture('append'),                               // Append text
+    'Ctrl+Shift+1': textCapture('h1'),                                   // Heading 1
+    'Ctrl+Shift+2': textCapture('h2'),                                   // Heading 2
+    'Ctrl+Shift+3': textCapture('h3'),                                   // Heading 3
+    'Ctrl+Shift+V': () => {                                              // Paste image
+      const pre = preflightImage();
+      if (!pre) return;
+      const s = beginSourceStamp();
+      enqueueCapture(() => captureImage(s, pre));
+    },
+    'Ctrl+Shift+N': () => {                                              // New paragraph
+      if (activeFilePath) showOverlayNotification('New Line Started', 'paragraph');
+      enqueueCapture(() => newParagraph());
+    },
+    'Ctrl+Shift+K': () => {                                              // Code block
+      const pre = preflightCode();
+      if (!pre) return;
+      const s = beginSourceStamp();
+      enqueueCapture(() => captureCodeBlock(s, pre));
+    },
+    'Ctrl+Shift+Z': () => enqueueCapture(() => performUndo()),           // Undo
+    'Ctrl+Shift+Y': () => enqueueCapture(() => performRedo()),           // Redo
+    'Ctrl+Shift+H': () => toggleHelpOverlay(),      // Help
+    'Ctrl+Shift+Q': () => toggleQuickInput(),       // Quick note popup
+    'Ctrl+Shift+E': () => explainFeature.triggerExplain(), // Explain selection
+    'Ctrl+Shift+M': () => toggleRecording(),        // Voice Memo
+    'Ctrl+Shift+B': plainText('bold'),                                   // Bold
+    'Ctrl+Shift+I': plainText('italic'),                                 // Italic
+    'Alt+R': plainText('red'),                                           // Red Text
+    'Alt+G': plainText('green'),                                         // Green Text
+    'Alt+B': plainText('blue'),                                          // Blue Text
+  };
+  for (const [key, handler] of Object.entries(shortcuts)) {
+    const success = globalShortcut.register(key, () => {
+      console.log(`[Casrion] hotkey ${key} at ${Date.now()}`);
+      handler();
+    });
+    console.log(`[Casrion] Shortcut ${key}: ${success ? 'registered' : 'FAILED'}`);
+  }
+  // Another app may own Ctrl+Shift+E; the explain hotkey is too central to
+  // silently lose, so fall back to Ctrl+Alt+E
+  if (!globalShortcut.isRegistered('Ctrl+Shift+E')) {
+    const ok = globalShortcut.register('Ctrl+Alt+E', () => explainFeature.triggerExplain());
+    console.log(`[Casrion] Explain fallback Ctrl+Alt+E: ${ok ? 'registered' : 'FAILED'}`);
+  }
+}
+
+// Folder names can contain characters that break URL parsing (#, ?, %).
+// Encode just those so casrion:// URLs survive `new URL()` intact; the
+// protocol handler decodes with decodeURIComponent.
+function encodeDirForUrl(dir) {
+  return dir.replace(/%/g, '%25').replace(/#/g, '%23').replace(/\?/g, '%3F');
+}
+
+function hydrateContentForRenderer(content, filePath) {
+  if (!content || !filePath) return content;
+  const dir = encodeDirForUrl(path.dirname(filePath).replace(/\\/g, '/'));
+  let hydrated = content.split(`](assets/`).join(`](casrion://${dir}/assets/`);
+  hydrated = hydrated.split(`src="assets/`).join(`src="casrion://${dir}/assets/`);
+  return hydrated;
+}
+
+// ─── IPC Handlers ──────────────────────────────────────────
+function registerIPC() {
+  ipcMain.handle('get-initial-state', () => buildStatePayload());
+
+  ipcMain.handle('save-audio', (event, buffer, mimeType) => {
+    isRecording = false;
+    try {
+      if (!activeFilePath) return;
+
+      // Confirm on screen before touching the disk; the writes happen behind it.
+      showOverlayNotification('Voice Memo Saved', 'mic');
+
+      const assetsDir = path.join(path.dirname(activeFilePath), 'assets');
+      if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+
+      // The recorder's real output format varies by machine — match the
+      // extension to it so the player loads the file correctly everywhere.
+      const mt = String(mimeType || 'audio/webm').toLowerCase();
+      const ext = mt.includes('ogg') ? 'ogg' : mt.includes('mp4') ? 'm4a' : mt.includes('mpeg') ? 'mp3' : 'webm';
+      const filename = `audio_${Date.now()}.${ext}`;
+      const audioPath = path.join(assetsDir, filename);
+
+      fs.writeFileSync(audioPath, Buffer.from(buffer));
+      console.log(`[Casrion] Saved audio to ${audioPath}`);
+
+      pushUndo();
+      // A voice memo is the user's own recording, never the front window's work
+      ensureStampBoundary();
+
+      const relativePath = `assets/${filename}`;
+      const audioMarkdown = `<audio controls src="${relativePath}"></audio>`;
+      insertionLine = insertNewLineAfter(audioMarkdown, insertionLine);
+
+      notifyRendererFileUpdated();
+    } catch (e) {
+      // The note's folder may have gone away mid-recording (USB/network
+      // drive) — say so instead of losing the memo without a word.
+      console.error('[Casrion] Failed to save voice memo:', e.message);
+      showOverlayNotification('Could not save the voice memo. Check the note folder is still available', 'error', 4000);
+    } finally {
+      rethrottleAfterRecording();
+      resolveRecordingFlush();
+    }
+  });
+
+  // Renderer reports that recording could not start/produce audio, so the
+  // main process state and the persistent "Recording..." toast get cleared.
+  ipcMain.handle('recording-failed', (_event, message) => {
+    isRecording = false;
+    showOverlayNotification(message || 'Recording failed. Check the microphone', 'error');
+    rethrottleAfterRecording();
+    resolveRecordingFlush();
+  });
+
+  let lastEditorUndoPush = 0;
+  ipcMain.handle('save-file-content', (_event, { content }) => {
+    if (!activeFilePath) return { error: 'No active file' };
+    // Editor saves arrive continuously while typing; snapshot at most every
+    // 15s so the undo stack isn't flooded by a single editing session.
+    const now = Date.now();
+    if (now - lastEditorUndoPush > 15000) {
+      pushUndo();
+      lastEditorUndoPush = now;
+    }
+
+    // Before saving, ensure any absolute memory paths are converted back to portable relative paths
+    const dir = encodeDirForUrl(path.dirname(activeFilePath).replace(/\\/g, '/'));
+    const escapeRegex = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const dirPattern = escapeRegex(`casrion://${dir}/assets/`);
+    
+    // Use case-insensitive regex
+    const mdRegex = new RegExp(`\\]\\(${dirPattern}`, 'gi');
+    const htmlRegex = new RegExp(`src="${dirPattern}`, 'gi');
+    
+    content = content.replace(mdRegex, `](assets/`);
+    content = content.replace(htmlRegex, `src="assets/`);
+    
+    fs.writeFileSync(activeFilePath, content);
+    console.log('[Casrion] File saved:', activeFilePath);
+    return { success: true };
+  });
+
+  ipcMain.handle('export-document', async (_event, options = {}) => {
+    const { isDarkMode } = options;
+    if (!activeFilePath || !fs.existsSync(activeFilePath)) return { error: 'No active file' };
+    
+    try {
+      let content = fs.readFileSync(activeFilePath, 'utf-8');
+      
+      // Inline images
+      const imageRegex = /!\[([^\]]*)\]\((assets\/[^)]+)\)/g;
+      content = content.replace(imageRegex, (match, alt, uri) => {
+        try {
+          const filePath = path.join(path.dirname(activeFilePath), uri);
+          if (fs.existsSync(filePath)) {
+            const ext = path.extname(filePath).toLowerCase().substring(1) || 'png';
+            const base64 = fs.readFileSync(filePath).toString('base64');
+            return `![${alt}](data:image/${ext};base64,${base64})`;
+          }
+        } catch (e) {
+          console.error('[Casrion] Failed to inline image', uri, e);
+        }
+        return match;
+      });
+
+      // Inline audio (relative assets/ paths, plus legacy file:/// links)
+      const audioRegex = /<audio\s+controls\s+src="([^"]+)"><\/audio>/g;
+      content = content.replace(audioRegex, (match, uri) => {
+        try {
+          let audioFile = null;
+          if (uri.startsWith('assets/')) {
+            audioFile = path.join(path.dirname(activeFilePath), uri);
+          } else if (uri.startsWith('file:///')) {
+            audioFile = decodeURI(uri.substring(8));
+          }
+          if (audioFile && fs.existsSync(audioFile)) {
+            const ext = path.extname(audioFile).toLowerCase().substring(1) || 'webm';
+            const base64 = fs.readFileSync(audioFile).toString('base64');
+            return `<audio controls src="data:audio/${ext};base64,${base64}"></audio>`;
+          }
+        } catch (e) {
+          console.error('[Casrion] Failed to inline audio', uri, e);
+        }
+        return match;
+      });
+
+      const { marked } = require('marked');
+      const markedKatex = require('marked-katex-extension');
+      marked.use(markedKatex({ throwOnError: false, nonStandard: true, output: 'mathml' }));
+      const htmlContent = marked(content);
+      const title = path.basename(activeFilePath, '.md');
+      const escapedTitle = title.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+      const template = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapedTitle} - Exported</title>
+  <style>
+    body {
+      margin: 0; padding: 40px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f3efe8;
+      color: #3f3c38;
+      line-height: 1.6;
+    }
+    .document-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #faf8f4;
+      padding: 60px 80px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    h1, h2, h3 { color: #1c1917; margin-top: 1.5em; }
+    h1 { font-size: 2.2rem; }
+    a { color: #a16207; }
+    img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 1em 0; }
+    audio { margin: 1em 0; width: 100%; max-width: 400px; height: 54px; display: block; outline: none; border-radius: 27px; }
+    pre { background: #26201c; color: #e9e2d8; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; }
+    blockquote { border-left: 4px solid #d4a373; margin: 0; padding-left: 16px; color: #57534e; background: rgba(212, 163, 115, 0.09); padding: 12px 16px; border-radius: 0 6px 6px 0; }
+
+    /* Table Styling */
+    table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+    th, td { border: 1px solid #d6cfc4; padding: 0.6rem 0.8rem; text-align: left; }
+    th { background: rgba(0, 0, 0, 0.03); font-weight: 650; }
+    
+    /* Dark Mode Support */
+    ${isDarkMode ? `
+    body { background: #110e0d; color: #cfc7bf; }
+    .document-container { background: #201c19; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    h1, h2, h3 { color: #f1ede8; }
+    a { color: #d4a373; }
+    blockquote { color: #c9c0b8; }
+    th, td { border-color: rgba(255, 255, 255, 0.14); }
+    th { background: rgba(255, 255, 255, 0.04); }
+    ` : ''}
+
+    /* Mobile Responsiveness */
+    @media (max-width: 600px) {
+      body { padding: 16px; }
+      .document-container { padding: 30px 20px; }
+      h1 { font-size: 1.8rem; }
+      pre { padding: 12px; }
+      audio { width: 100%; max-width: 100%; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="document-container">
+    ${htmlContent}
+  </div>
+</body>
+</html>`;
+
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Portable Document',
+        defaultPath: path.join(path.dirname(activeFilePath), `${title}.html`),
+        filters: [{ name: 'HTML Document', extensions: ['html'] }]
+      });
+
+      if (!result.canceled && result.filePath) {
+        fs.writeFileSync(result.filePath, template, 'utf-8');
+        return { success: true, filePath: result.filePath };
+      }
+      return { canceled: true };
+    } catch (e) {
+      console.error('[Casrion] Export failed:', e);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Add Folder to Workspace'
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selected = result.filePaths[0];
+      if (!settings.workingFolders.includes(selected)) {
+        settings.workingFolders.push(selected);
+        saveSettings();
+      }
+
+      const files = listMdFiles(selected);
+      if (files.length > 0 && !activeFilePath) {
+        activeFilePath = files[0].path;
+        insertionLine = -1;
+        settings.lastActiveFile = activeFilePath;
+        saveSettings();
+      }
+      return buildStatePayload();
+    }
+    return null;
+  });
+
+  ipcMain.handle('remove-folder', (_event, folderPath) => {
+    settings.workingFolders = settings.workingFolders.filter(f => f !== folderPath);
+    saveSettings();
+
+    // Auto-clear active file if it was inside the removed folder.
+    // path.relative avoids the prefix trap ("C:\Notes2".startsWith("C:\Notes")).
+    if (activeFilePath) {
+      const rel = path.relative(folderPath, activeFilePath);
+      if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+        activeFilePath = null;
+        insertionLine = -1;
+        settings.lastActiveFile = null;
+        saveSettings();
+      }
+    }
+
+    return buildStatePayload();
+  });
+
+  // Deletions are recoverable by design: everything goes to the Recycle Bin
+  // via shell.trashItem, never a permanent unlink. If the OS refuses (rare:
+  // network drives without a bin), we leave the file alone and say so.
+  ipcMain.handle('delete-file', async (_event, filePath) => {
+    try {
+      if (fs.existsSync(filePath)) await shell.trashItem(filePath);
+    } catch (e) {
+      return { error: 'Could not move the note to the Recycle Bin: ' + e.message };
+    }
+    // Forget undo snapshots of the deleted note so undo can never write its
+    // old content into whichever file becomes active next.
+    undoStack = undoStack.filter((s) => s.filePath !== filePath);
+    redoStack = redoStack.filter((s) => s.filePath !== filePath);
+    if (activeFilePath === filePath) {
+      activeFilePath = null;
+      insertionLine = -1;
+      settings.lastActiveFile = null;
+      saveSettings();
+    }
+    return buildStatePayload();
+  });
+
+  ipcMain.handle('delete-folder', async (_event, folderPath) => {
+    try {
+      if (fs.existsSync(folderPath)) await shell.trashItem(folderPath);
+    } catch (e) {
+      return { error: 'Could not move the folder to the Recycle Bin: ' + e.message };
+    }
+    settings.workingFolders = (settings.workingFolders || []).filter((f) => f !== folderPath);
+    // path.relative avoids the prefix trap ("C:\Notes2".startsWith("C:\Notes"))
+    const isInside = (p) => {
+      const rel = path.relative(folderPath, p);
+      return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+    };
+    undoStack = undoStack.filter((s) => !isInside(s.filePath));
+    redoStack = redoStack.filter((s) => !isInside(s.filePath));
+    if (activeFilePath && isInside(activeFilePath)) {
+      activeFilePath = null;
+      insertionLine = -1;
+      settings.lastActiveFile = null;
+    }
+    saveSettings();
+    return buildStatePayload();
+  });
+
+  ipcMain.handle('create-file', (_event, payload) => {
+    // Legacy support or new multi-root payload
+    const fileName = typeof payload === 'string' ? payload : payload.fileName;
+    const targetFolder = typeof payload === 'string' ? settings.workingFolders[0] : payload.targetFolder;
+
+    if (!targetFolder) return { error: 'No folder selected' };
+    const safeName = fileName.replace(/[^a-zA-Z0-9_\-\.\s]/g, '').replace(/^\.+/, '').trim();
+    if (!safeName) return { error: 'Invalid file name' };
+    // Windows reserves device names — creating "CON.md" fails or misbehaves
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(safeName)) {
+      return { error: 'That name is reserved by Windows. Pick another' };
+    }
+
+    const filePath = path.join(targetFolder, safeName + '.md');
+    if (fs.existsSync(filePath)) return { error: 'File already exists' };
+
+    try {
+      fs.writeFileSync(filePath, `# ${safeName}\n`);
+    } catch (e) {
+      return { error: 'Could not create the note: ' + e.message };
+    }
+    activeFilePath = filePath;
+    insertionLine = 0; // Point to the heading line
+    settings.lastActiveFile = activeFilePath;
+    saveSettings();
+
+    return buildStatePayload();
+  });
+
+  ipcMain.handle('set-active-file', (_event, filePath) => {
+    if (fs.existsSync(filePath)) {
+      activeFilePath = filePath;
+      insertionLine = -1;
+      settings.lastActiveFile = activeFilePath;
+      saveSettings();
+      return buildStatePayload();
+    }
+    return { error: 'File not found' };
+  });
+
+  ipcMain.handle('set-insertion-line', (_event, line) => {
+    insertionLine = line;
+    console.log('[Casrion] Insertion point set to line:', line);
+    return { insertionLine };
+  });
+
+  ipcMain.handle('get-note-content', () => {
+    let content = activeFilePath ? readFileContent(activeFilePath) : '';
+    return hydrateContentForRenderer(content, activeFilePath);
+  });
+
+  // Quick note popup (fire-and-forget events from the popup window)
+  ipcMain.on('quick-input-submit', (_event, payload) => {
+    const { text, mode, keepOpen } = payload || {};
+    // Ctrl+Enter keeps the popup open so a heading, some text, and a quote
+    // can be added one after another without reopening it each time.
+    if (!keepOpen && quickInputWindow && !quickInputWindow.isDestroyed()) quickInputWindow.hide();
+    // Same ordered queue as hotkey captures so nothing interleaves mid-write
+    enqueueCapture(() => insertTypedText(text, String(mode || 'text')));
+  });
+  ipcMain.on('quick-input-hide', () => {
+    if (quickInputWindow && !quickInputWindow.isDestroyed()) quickInputWindow.hide();
+  });
+  ipcMain.on('help-overlay-hide', () => {
+    if (helpOverlayWindow && !helpOverlayWindow.isDestroyed()) helpOverlayWindow.hide();
+  });
+
+  ipcMain.handle('set-stamp-source', (_event, enabled) => {
+    setStampSource(enabled);
+    return { stampSource: !!settings.stampSource };
+  });
+
+  ipcMain.handle('app-mark', () => {
+    const mark = Buffer.from(APP_MARK, 'base64').toString('utf-8');
+    showOverlayNotification(mark, 'text', 6000);
+    return mark;
+  });
+
+  // The native minimize/maximize/close buttons are drawn by Windows, so they
+  // must be recolored from here whenever the renderer switches theme.
+  ipcMain.handle('set-titlebar-theme', (event, dark) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+      mainWindow.setTitleBarOverlay(dark
+        ? { color: '#1c1816', symbolColor: '#9a8f87', height: 40 }
+        : { color: '#e6dbc5', symbolColor: '#5f5344', height: 40 });
+    } catch { /* not supported on this platform */ }
+  });
+
+  ipcMain.handle('quit-app', () => {
+    quitApp();
+  });
+}
+
+// ─── App Lifecycle ─────────────────────────────────────────
+
+// A second instance can't register the global shortcuts (they'd silently
+// fail), so redirect it to the running one instead.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
+const ASSET_MIME = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.avif': 'image/avif',
+  '.webm': 'audio/webm', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
+  '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.pdf': 'application/pdf', '.txt': 'text/plain'
+};
+
+// Read an asset with retries. Freshly captured files are often briefly
+// locked by antivirus/indexing services (EBUSY/EPERM) right when the
+// renderer requests them — one failed read must not surface as a broken
+// image. Whole-buffer reads also avoid mid-stream failures after the
+// response headers have already been sent.
+const fsp = fs.promises;
+const MAX_BUFFERED_ASSET = 64 * 1024 * 1024;
+async function readAssetWithRetry(filePath, attempts = 4) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const stat = await fsp.stat(filePath);
+      if (!stat.isFile()) { const e = new Error('not a file'); e.code = 'EISDIR'; throw e; }
+      if (stat.size > MAX_BUFFERED_ASSET) return { stream: true, size: stat.size };
+      const data = await fsp.readFile(filePath);
+      return { data, size: data.length };
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 120 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+app.whenReady().then(() => {
+  // A second instance is already quitting (lock check above) — it must not
+  // race the real one for the tray, shortcuts and protocol registration.
+  if (!gotSingleInstanceLock) return;
+
+  // Ties the taskbar icon, notifications and pinning to our app identity
+  // (without it Windows groups the app under a generic Electron identity).
+  app.setAppUserModelId('com.casrion.app');
+
+  protocol.handle('casrion', async (request) => {
+    try {
+      const u = new URL(request.url);
+      const filePath = path.normalize(decodeURIComponent(u.host + ':' + u.pathname));
+
+      // Only serve files that live inside a workspace folder — this scheme
+      // must not be a read-anything-on-disk primitive for rendered HTML.
+      const allowed = (settings.workingFolders || []).some(folder => {
+        const rel = path.relative(folder, filePath);
+        return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+      });
+      if (!allowed) {
+        console.warn('[Casrion] Blocked casrion:// request outside workspace:', filePath);
+        return new Response('Forbidden', { status: 403, headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      const asset = await readAssetWithRetry(filePath);
+      const mime = ASSET_MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+      // no-store: a response must never be cached, so one bad read can not
+      // leave a player permanently broken across sessions.
+      const baseHeaders = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+      const size = asset.size;
+
+      // Honor HTTP Range requests — Chromium's <audio>/<video> stack issues
+      // them for media, and a plain 200-only response leaves players stuck
+      // in a "disabled"/unseekable state on some machines.
+      const rangeHeader = request.headers.get('Range');
+      const match = rangeHeader && /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+      if (match && (match[1] !== '' || match[2] !== '')) {
+        let start, end;
+        if (match[1] === '') {
+          // Suffix range: last N bytes
+          start = Math.max(0, size - parseInt(match[2], 10));
+          end = size - 1;
+        } else {
+          start = parseInt(match[1], 10);
+          end = match[2] === '' ? size - 1 : Math.min(parseInt(match[2], 10), size - 1);
+        }
+        if (start > end || start >= size) {
+          return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}`, 'Cache-Control': 'no-store' } });
+        }
+        const rangeHeaders = {
+          ...baseHeaders,
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Content-Length': String(end - start + 1)
+        };
+        const body = asset.data
+          ? asset.data.subarray(start, end + 1)
+          : Readable.toWeb(fs.createReadStream(filePath, { start, end }));
+        return new Response(body, { status: 206, headers: rangeHeaders });
+      }
+
+      const body = asset.data ? asset.data : Readable.toWeb(fs.createReadStream(filePath));
+      return new Response(body, {
+        status: 200,
+        headers: { ...baseHeaders, 'Content-Length': String(size) }
+      });
+    } catch (e) {
+      console.error('[Casrion] Failed to serve asset:', request.url, e.message);
+      // no-store here too — a cached 404 outlives the transient file lock
+      // that caused it and replays the failure on every later load attempt.
+      return new Response('File not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    }
+  });
+
+  loadSettings();
+
+  if (settings.lastActiveFile && fs.existsSync(settings.lastActiveFile)) {
+    activeFilePath = settings.lastActiveFile;
+  }
+
+  // Warm up the source-title helper if the user left stamping enabled, and
+  // send one throwaway request so PowerShell compiles its UI Automation
+  // types now instead of during the first real capture. Deferred a few
+  // seconds: spawning PowerShell during launch competes with the window's
+  // first paint on slower machines, and a capture that beats the timer
+  // starts the helper on demand anyway.
+  if (settings.stampSource) {
+    setTimeout(() => {
+      if (settings.stampSource) {
+        startTitleHelper();
+        getForegroundSourceInfo(5000);
+      }
+    }, 3500);
+  }
+
+  createWindow();
+  createOverlayWindow();
+  createTray();
+  registerShortcuts();
+  registerIPC();
+
+  explainFeature.init({
+    getForegroundSourceInfo: (timeoutMs) => getForegroundSourceInfo(timeoutMs, true),
+    cleanSourceTitle,
+    showOverlayNotification,
+    enqueueCapture,
+    insertTypedText,
+    getActiveFilePath: () => activeFilePath,
+    getSettings: () => settings,
+    saveSettings
+  });
+
+  // The help and quick-note windows exist so their hotkeys open instantly,
+  // but each one is a whole renderer process — keep them off the launch
+  // critical path and build them once the main window is on screen.
+  const warmSecondaryWindows = () => {
+    if (!helpOverlayWindow || helpOverlayWindow.isDestroyed()) createHelpOverlay();
+    if (!quickInputWindow || quickInputWindow.isDestroyed()) createQuickInputWindow();
+    // Also builds the explain popup and starts the selection watcher so the
+    // hotkey works on text selected before its first use
+    explainFeature.warmUp();
+  };
+  mainWindow.once('show', () => setTimeout(warmSecondaryWindows, 1500));
+  setTimeout(warmSecondaryWindows, 6000); // fallback if the window stays hidden
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => { /* Keep running in tray */ });
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  stopTitleHelper();
+  explainFeature.shutdown();
+});

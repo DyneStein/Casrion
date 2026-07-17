@@ -1,0 +1,23 @@
+/* Self-hosted variable fonts — the app must not depend on Google Fonts at runtime */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url(./montserrat.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(./outfit.woff2) format('woff2');
+}
+/* Wordmark: sharp geometric display face with cut corners */
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(./chakra-petch-700.woff2) format('woff2');
+}

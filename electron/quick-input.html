@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Casrion Quick Note</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .panel {
+      width: 100%;
+      background: rgba(246, 239, 225, 0.99);
+      border: 1.5px solid #9c4a1f;
+      border-radius: 3px;
+      box-shadow: 4px 5px 0 rgba(36, 29, 21, 0.25), 0 18px 50px rgba(0, 0, 0, 0.22);
+      padding: 14px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .target {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.05em;
+      color: #8c7d69;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .target strong { color: #9c4a1f; font-weight: 600; }
+    .modes { display: flex; gap: 4px; flex-shrink: 0; }
+    .mode {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      color: #5f5344;
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .mode:hover { color: #241d15; background: rgba(156, 74, 31, 0.08); }
+    .mode.selected {
+      background: rgba(156, 74, 31, 0.12);
+      border-color: #9c4a1f;
+      color: #9c4a1f;
+    }
+    textarea {
+      width: 100%;
+      resize: none;
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(36, 29, 21, 0.22);
+      border-radius: 3px;
+      color: #241d15;
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 9px 11px;
+      height: 84px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea:focus { border-color: #9c4a1f; }
+    textarea::placeholder { color: #99896f; }
+    .bottom-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      font-size: 10px;
+      color: #99896f;
+    }
+    .hint span { color: #5f5344; font-weight: 600; }
+    .error {
+      color: #c03d3d;
+      font-size: 11px;
+      display: none;
+    }
+    .panel.no-file .error { display: block; }
+    .panel.no-file textarea { opacity: 0.45; }
+  </style>
+</head>
+<body>
+  <div class="panel" id="panel">
+    <div class="top-row">
+      <div class="target" id="target">Add to note</div>
+      <div class="modes" id="modes">
+        <button class="mode selected" data-mode="text" title="Adds what you type as normal text. Lines starting with #, - or > keep their markdown meaning">Text</button>
+        <button class="mode" data-mode="h1" title="Adds what you type as a large heading">H1</button>
+        <button class="mode" data-mode="h2" title="Adds what you type as a medium heading">H2</button>
+        <button class="mode" data-mode="h3" title="Adds what you type as a small heading">H3</button>
+        <button class="mode" data-mode="bullet" title="Adds each line as a bullet point">List</button>
+        <button class="mode" data-mode="quote" title="Adds what you type as a quote">Quote</button>
+      </div>
+    </div>
+    <textarea id="input" placeholder="Type here, press Enter to add. Markdown works too: # heading, - list, > quote..." spellcheck="false"></textarea>
+    <div class="bottom-row">
+      <div class="hint"><span>Enter</span> add &nbsp;&middot;&nbsp; <span>Ctrl+Enter</span> add and keep writing &nbsp;&middot;&nbsp; <span>Shift+Enter</span> new line &nbsp;&middot;&nbsp; <span>Ctrl+1..6</span> type &nbsp;&middot;&nbsp; <span>Esc</span> close</div>
+      <div class="error" id="error">No note selected. Open the main window and pick a note first</div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const panel = document.getElementById('panel');
+    const input = document.getElementById('input');
+    const target = document.getElementById('target');
+    const modesEl = document.getElementById('modes');
+
+    let mode = 'text';
+    let hasFile = false;
+    const MODE_ORDER = ['text', 'h1', 'h2', 'h3', 'bullet', 'quote'];
+
+    function setMode(m) {
+      mode = m;
+      for (const btn of modesEl.querySelectorAll('.mode')) {
+        btn.classList.toggle('selected', btn.dataset.mode === m);
+      }
+    }
+
+    modesEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mode');
+      if (btn) { setMode(btn.dataset.mode); input.focus(); }
+    });
+
+    ipcRenderer.on('quick-input-context', (_event, ctx) => {
+      hasFile = !!ctx.fileName;
+      panel.classList.toggle('no-file', !hasFile);
+      target.innerHTML = hasFile
+        ? 'Add to <strong></strong>'
+        : 'Add to note';
+      if (hasFile) target.querySelector('strong').textContent = ctx.fileName;
+      setMode('text');
+      input.focus();
+      // Put the cursor at the end of any kept draft
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+
+    function submit(keepOpen) {
+      const text = input.value.replace(/\s+$/, '');
+      if (!text.trim() || !hasFile) return;
+      ipcRenderer.send('quick-input-submit', { text, mode, keepOpen: !!keepOpen });
+      input.value = '';
+      setMode('text');
+      if (keepOpen) input.focus();
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.isComposing) return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submit(e.ctrlKey);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        ipcRenderer.send('quick-input-hide');
+      } else if (e.ctrlKey && !e.altKey && e.key >= '1' && e.key <= '6') {
+        e.preventDefault();
+        setMode(MODE_ORDER[Number(e.key) - 1]);
+      }
+    });
+
+    // Keep window-level Escape working even if the textarea loses focus
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') ipcRenderer.send('quick-input-hide');
+    });
+  </script>
+</body>
+</html>

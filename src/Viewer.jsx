@@ -1,0 +1,541 @@
+import { useRef, useEffect, useMemo, useState, Component, memo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { ChevronRight, List, X, Link2 } from 'lucide-react';
+
+// Source stamps are stored in the note as `<sub>Source: title · time</sub>`
+// lines (older notes may carry a paperclip emoji variant). They are not
+// rendered as text — they become right-click metadata on the blocks below.
+const STAMP_RE = /^<sub[^>]*>\s*(?:Source:\s*|📎\s*)?([\s\S]*?)<\/sub>\s*$/;
+
+/**
+ * One malformed block (broken raw HTML, hostile TeX, etc.) must never blank
+ * the whole document — render that block as plain text and keep going.
+ */
+class BlockBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.error('[Casrion] Block render failed:', err); }
+  // No reset logic needed: blocks are keyed by their content, so edited
+  // text mounts a fresh boundary automatically.
+  render() {
+    if (this.state.failed) {
+      return <pre className="doc-block-fallback">{this.props.text}</pre>;
+    }
+    return this.props.children;
+  }
+}
+
+const ASSET_RETRIES = 5;
+const retryDelay = (attempt) => 350 * Math.pow(2, attempt - 1); // 350ms → 5.6s
+
+/**
+ * Image that heals itself. A freshly captured screenshot can fail its very
+ * first load (antivirus briefly locks the new file); since blocks keep
+ * stable keys across updates, a broken <img> would otherwise stay broken
+ * until the app restarts. On error we reload with a cache-busting query.
+ */
+function AssetImage({ node: _node, src, ...props }) {
+  const [attempt, setAttempt] = useState(0);
+  const attemptRef = useRef(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    // New source — start fresh
+    attemptRef.current = 0;
+    setAttempt(0);
+    return () => clearTimeout(timerRef.current);
+  }, [src]);
+
+  const isLocal = typeof src === 'string' && src.startsWith('casrion://');
+  const url = isLocal && attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+
+  const handleError = () => {
+    if (!isLocal || attemptRef.current >= ASSET_RETRIES) return;
+    attemptRef.current += 1;
+    const next = attemptRef.current;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setAttempt(next), retryDelay(next));
+  };
+
+  // lazy + async: a long note full of screenshots only decodes what is on
+  // screen, which keeps scrolling smooth and memory flat on weaker machines.
+  return <img {...props} src={url} onError={handleError} alt={props.alt ?? ''} loading="lazy" decoding="async" />;
+}
+
+/**
+ * Audio player for voice memos. Recorded WebM files carry no duration
+ * metadata (duration reads as Infinity), which leaves the native player's
+ * seek bar dead. Forcing a seek past the end makes the browser resolve the
+ * real duration, after which the controls behave normally.
+ *
+ * Failed loads self-heal like images do: retries swap in a cache-busted URL,
+ * because Chromium pins the failure to the original URL for a while — a
+ * plain load() (or even unmount/remount on the same src) replays the cached
+ * error and the player looks permanently dead. The retry budget resets on
+ * every successful load so one bad stretch (antivirus briefly locking a
+ * fresh recording) can never disable the player for the rest of the session,
+ * and clicking a dead player retries immediately.
+ */
+const AUDIO_RETRIES = 8;
+function AudioNote({ node: _node, src, ...props }) {
+  const audioRef = useRef(null);
+  const [attempt, setAttempt] = useState(0);
+  const attemptRef = useRef(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    // New source — start fresh
+    attemptRef.current = 0;
+    setAttempt(0);
+  }, [src]);
+
+  const isLocal = typeof src === 'string' && src.startsWith('casrion://');
+  const url = isLocal && attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+
+    const fixDuration = () => {
+      if (el.duration === Infinity || Number.isNaN(el.duration)) {
+        const rewind = () => {
+          el.currentTime = 0;
+          el.removeEventListener('seeked', rewind);
+        };
+        el.addEventListener('seeked', rewind);
+        el.currentTime = 1e101;
+      }
+    };
+    const handleLoaded = () => {
+      attemptRef.current = 0;
+      fixDuration();
+    };
+    const handleError = () => {
+      if (!isLocal || attemptRef.current >= AUDIO_RETRIES) return;
+      attemptRef.current += 1;
+      const next = attemptRef.current;
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setAttempt(next), Math.min(retryDelay(next), 8000));
+    };
+
+    el.addEventListener('loadedmetadata', handleLoaded);
+    el.addEventListener('error', handleError);
+    return () => {
+      clearTimeout(timerRef.current);
+      el.removeEventListener('loadedmetadata', handleLoaded);
+      el.removeEventListener('error', handleError);
+    };
+  }, [url, isLocal]);
+
+  // A click anywhere on a dead player revives it on the spot — users mash
+  // the play button when it looks stuck, so make that gesture the fix.
+  const handleClick = () => {
+    const el = audioRef.current;
+    if (!el || !el.error || !isLocal) return;
+    clearTimeout(timerRef.current);
+    attemptRef.current += 1;
+    setAttempt(attemptRef.current);
+  };
+
+  return <audio {...props} src={url} ref={audioRef} controls preload="metadata" onClick={handleClick} />;
+}
+
+// Stable plugin references so the memoized block renderer's props never
+// change identity between renders.
+const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const MD_COMPONENTS = { audio: AudioNote, img: AssetImage };
+const passUrl = (url) => url;
+
+/**
+ * Markdown for one block, memoized on its text. Long notes re-render on
+ * every capture; without this every block re-parses its markdown each time,
+ * which adds up fast on lower-end machines. With it, only changed blocks pay.
+ */
+const BlockMarkdown = memo(function BlockMarkdown({ text }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={REMARK_PLUGINS}
+      rehypePlugins={REHYPE_PLUGINS}
+      urlTransform={passUrl}
+      components={MD_COMPONENTS}
+    >{text}</ReactMarkdown>
+  );
+});
+
+// Source strings are stored HTML-escaped inside the stamp; undo that for
+// display and split out any web address so it can be a clickable link.
+function unescapeEntities(s) {
+  return (s || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+function SourceText({ source }) {
+  const text = unescapeEntities(source);
+  const parts = text.split(/(https?:\/\/\S+)/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part)
+          ? <a key={i} href={part} className="source-link">{part}</a>
+          : <span key={i}>{part}</span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Groups raw lines into semantic "blocks" for proper markdown rendering.
+ * Each block contains one or more consecutive lines that form a single
+ * markdown element (paragraph, heading, list, code fence, etc.)
+ */
+function parseBlocks(content) {
+  if (!content) return [];
+
+  const lines = content.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // ── Code fence block ────────────────────────
+    if (line.trimStart().startsWith('```')) {
+      const startLine = i;
+      const blockLines = [line];
+      i++;
+      while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
+        blockLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) {
+        blockLines.push(lines[i]); // closing ```
+        i++;
+      }
+      blocks.push({ type: 'code', text: blockLines.join('\n'), startLine, endLine: i - 1 });
+      continue;
+    }
+
+    // ── Source stamp (hidden metadata line) ─────
+    const stampMatch = STAMP_RE.exec(line.trim());
+    if (stampMatch) {
+      blocks.push({ type: 'stamp', text: line, startLine: i, endLine: i, stampSource: stampMatch[1].trim() });
+      i++;
+      continue;
+    }
+
+    // A stamp with text glued onto the same line (captures made before the
+    // append fix): split it so the stamp hides and the text still shows.
+    const glued = /^(<sub[^>]*>\s*(?:Source:\s*|📎\s*)?([\s\S]*?)<\/sub>)\s*(\S[\s\S]*)$/.exec(line.trim());
+    if (glued) {
+      blocks.push({ type: 'stamp', text: glued[1], startLine: i, endLine: i, stampSource: glued[2].trim() });
+      blocks.push({ type: 'paragraph', text: glued[3], startLine: i, endLine: i });
+      i++;
+      continue;
+    }
+
+    // ── Heading ─────────────────────────────────
+    if (/^#{1,6}\s/.test(line)) {
+      blocks.push({ type: 'heading', text: line, startLine: i, endLine: i });
+      i++;
+      continue;
+    }
+
+    // ── Image ───────────────────────────────────
+    if (line.trimStart().startsWith('![')) {
+      blocks.push({ type: 'image', text: line, startLine: i, endLine: i });
+      i++;
+      continue;
+    }
+
+    // ── Blockquote (consecutive > lines) ────────
+    if (line.startsWith('> ') || line === '>') {
+      const startLine = i;
+      const blockLines = [line];
+      i++;
+      while (i < lines.length && (lines[i].startsWith('> ') || lines[i] === '>')) {
+        blockLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'quote', text: blockLines.join('\n'), startLine, endLine: i - 1 });
+      continue;
+    }
+
+    // ── List (consecutive - or * lines) ─────────
+    if (/^[\s]*[-*]\s/.test(line) || /^[\s]*\d+\.\s/.test(line)) {
+      const startLine = i;
+      const blockLines = [line];
+      i++;
+      while (i < lines.length && (/^[\s]*[-*]\s/.test(lines[i]) || /^[\s]*\d+\.\s/.test(lines[i]) || (lines[i].startsWith('  ') && lines[i].trim() !== ''))) {
+        blockLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'list', text: blockLines.join('\n'), startLine, endLine: i - 1 });
+      continue;
+    }
+
+    // ── Blank line ──────────────────────────────
+    if (line.trim() === '') {
+      blocks.push({ type: 'blank', text: '', startLine: i, endLine: i });
+      i++;
+      continue;
+    }
+
+    // ── Paragraph (consecutive non-empty text) ──
+    {
+      const startLine = i;
+      const blockLines = [line];
+      i++;
+      while (
+        i < lines.length &&
+        lines[i].trim() !== '' &&
+        !/^#{1,6}\s/.test(lines[i]) &&
+        !lines[i].trimStart().startsWith('![') &&
+        !lines[i].trimStart().startsWith('```') &&
+        !lines[i].startsWith('> ') &&
+        !/^[\s]*[-*]\s/.test(lines[i]) &&
+        !/^[\s]*\d+\.\s/.test(lines[i]) &&
+        !STAMP_RE.test(lines[i].trim())
+      ) {
+        blockLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'paragraph', text: blockLines.join('\n'), startLine, endLine: i - 1 });
+    }
+  }
+
+  return blocks;
+}
+
+function Viewer({ content, insertionLine, onSetInsertionLine }) {
+  const viewerRef = useRef(null);
+  const activeBlockRef = useRef(null);
+  const [showOutline, setShowOutline] = useState(() => localStorage.getItem('casrion_outline') !== 'off');
+  const [sourcePopover, setSourcePopover] = useState(null); // { x, y, source }
+
+  // The source popover dismisses on any click, scroll or Escape
+  useEffect(() => {
+    if (!sourcePopover) return;
+    const close = () => setSourcePopover(null);
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [sourcePopover]);
+
+  const showSource = (e, source) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSourcePopover({
+      x: Math.min(e.clientX, window.innerWidth - 340),
+      y: Math.min(e.clientY, window.innerHeight - 90),
+      source
+    });
+  };
+
+  const toggleOutline = () => {
+    setShowOutline((prev) => {
+      localStorage.setItem('casrion_outline', prev ? 'off' : 'on');
+      return !prev;
+    });
+  };
+
+  const jumpToLine = (line) => {
+    const el = viewerRef.current?.querySelector(`[data-line="${line}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Scroll to active block smoothly
+  useEffect(() => {
+    if (activeBlockRef.current) {
+      activeBlockRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [insertionLine, content]);
+
+  // Key blocks by their own content, not their index — with index keys,
+  // inserting a capture above an <audio> block remounts the player and cuts
+  // off playback. Content-derived keys keep untouched blocks mounted.
+  const blocks = useMemo(() => {
+    const parsed = parseBlocks(content);
+    const seen = new Map();
+    // A stamp applies to everything below it until the next stamp
+    let currentSource = null;
+    for (const block of parsed) {
+      if (block.type === 'stamp') {
+        currentSource = block.stampSource || null;
+      } else if (block.type !== 'blank') {
+        block.source = currentSource;
+      }
+      const base = `${block.type}:${block.text.length}:${block.text.slice(0, 80)}`;
+      const n = seen.get(base) || 0;
+      seen.set(base, n + 1);
+      block.key = `${base}#${n}`;
+    }
+    return parsed;
+  }, [content]);
+
+  // Auto table-of-contents from the note's headings
+  const outline = useMemo(() => blocks
+    .filter((b) => b.type === 'heading')
+    .map((b) => {
+      const m = /^(#{1,6})\s+(.*)$/.exec(b.text);
+      return {
+        level: m ? m[1].length : 1,
+        label: (m ? m[2] : b.text).replace(/[*_`#]/g, '').trim(),
+        line: b.startLine,
+        key: b.key
+      };
+    }), [blocks]);
+
+  if (!content) {
+    return (
+      <div className="viewer-empty">
+        <h2>No file selected</h2>
+        <p>Select a file from the sidebar, or create a new note to get started.</p>
+        <p className="shortcut-hint">The shortcuts you will reach for most:</p>
+        <div className="shortcut-grid">
+          <div className="shortcut-card">
+            <div className="shortcut-keys"><span className="kbd">Ctrl</span><span className="kbd-plus">+</span><span className="kbd">Shift</span><span className="kbd-plus">+</span><span className="kbd">C</span></div>
+            <div className="shortcut-label">Append copied text</div>
+          </div>
+          <div className="shortcut-card">
+            <div className="shortcut-keys"><span className="kbd">Ctrl</span><span className="kbd-plus">+</span><span className="kbd">Shift</span><span className="kbd-plus">+</span><span className="kbd">Q</span></div>
+            <div className="shortcut-label">Type a quick note</div>
+          </div>
+          <div className="shortcut-card">
+            <div className="shortcut-keys"><span className="kbd">Ctrl</span><span className="kbd-plus">+</span><span className="kbd">Shift</span><span className="kbd-plus">+</span><span className="kbd">V</span></div>
+            <div className="shortcut-label">Paste image</div>
+          </div>
+          <div className="shortcut-card">
+            <div className="shortcut-keys"><span className="kbd">Ctrl</span><span className="kbd-plus">+</span><span className="kbd">Shift</span><span className="kbd-plus">+</span><span className="kbd">M</span></div>
+            <div className="shortcut-label">Voice memo</div>
+          </div>
+          <div className="shortcut-card">
+            <div className="shortcut-keys"><span className="kbd">Ctrl</span><span className="kbd-plus">+</span><span className="kbd">Shift</span><span className="kbd-plus">+</span><span className="kbd">H</span></div>
+            <div className="shortcut-label">All shortcuts</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if a block contains the active insertion line
+  const isBlockActive = (block) => {
+    if (insertionLine === -1) return false;
+    return insertionLine >= block.startLine && insertionLine <= block.endLine;
+  };
+
+  const isAppendEnd = insertionLine === -1;
+
+  return (
+    <div className="viewer" ref={viewerRef}>
+      {outline.length >= 2 && !showOutline && (
+        <button className="outline-toggle" onClick={toggleOutline} title="Show outline">
+          <List size={16} strokeWidth={1.5} />
+        </button>
+      )}
+      {outline.length >= 2 && showOutline && (
+        <nav className="outline-panel">
+          <div className="outline-header">
+            <span>Outline</span>
+            <button className="outline-close" onClick={toggleOutline} title="Hide outline">
+              <X size={14} strokeWidth={1.5} />
+            </button>
+          </div>
+          <div className="outline-items">
+            {outline.map((h) => (
+              <button
+                key={h.key}
+                className={`outline-item outline-level-${Math.min(h.level, 3)}`}
+                onClick={() => jumpToLine(h.line)}
+                title={h.label}
+              >
+                {h.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+      <div className="document-body">
+        {blocks.map((block) => {
+          const active = isBlockActive(block);
+
+          // Stamps carry metadata only; the blocks below them show it
+          if (block.type === 'stamp') return null;
+
+          if (block.type === 'blank') {
+            return (
+              <div
+                key={block.key}
+                data-line={block.startLine}
+                className={`doc-block doc-block-blank ${active ? 'doc-block-active' : ''}`}
+                onClick={() => onSetInsertionLine(block.endLine)}
+                ref={active ? activeBlockRef : null}
+              />
+            );
+          }
+
+          return (
+            <div
+              key={block.key}
+              data-line={block.startLine}
+              className={`doc-block doc-block-${block.type} ${active ? 'doc-block-active' : ''} ${block.source ? 'doc-block-sourced' : ''}`}
+              onClick={() => onSetInsertionLine(block.endLine)}
+              onContextMenu={block.source ? (e) => showSource(e, block.source) : undefined}
+              ref={active ? activeBlockRef : null}
+            >
+              {active && (
+                <div className="active-indicator">
+                  <ChevronRight size={14} strokeWidth={1.5} />
+                </div>
+              )}
+              {block.source && (
+                <button
+                  className="source-marker"
+                  title={`Source: ${block.source}. Click for details`}
+                  onClick={(e) => showSource(e, block.source)}
+                >
+                  <Link2 size={12} strokeWidth={1.5} />
+                </button>
+              )}
+              <div className="doc-block-content">
+                <BlockBoundary text={block.text}>
+                  <BlockMarkdown text={block.text} />
+                </BlockBoundary>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Append-at-end zone */}
+        <div
+          className={`doc-block doc-block-end ${isAppendEnd ? 'doc-block-active' : ''}`}
+          onClick={() => onSetInsertionLine(-1)}
+          ref={isAppendEnd ? activeBlockRef : null}
+        >
+          <span className="end-label">End of document. New content is added here</span>
+        </div>
+      </div>
+
+      {sourcePopover && (
+        <div className="source-popover" style={{ left: sourcePopover.x, top: sourcePopover.y }}>
+          <div className="source-popover-title">Captured from</div>
+          <div className="source-popover-text"><SourceText source={sourcePopover.source} /></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Viewer;
