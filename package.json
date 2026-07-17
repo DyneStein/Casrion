@@ -22,6 +22,8 @@
     "appId": "com.casrion.app",
     "productName": "Casrion",
     "copyright": "Copyright © 2026 Casrion",
+    "publish": null,
+    "afterPack": "scripts/mac-adhoc-sign.cjs",
     "directories": {
       "output": "dist-electron",
       "buildResources": "build"
