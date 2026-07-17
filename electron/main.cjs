@@ -732,7 +732,7 @@ function refreshTrayMenu() {
       click: (item) => setStampSource(item.checked)
     },
     {
-      label: 'Explain selection (double-tap Ctrl)',
+      label: `Explain selection (double-tap ${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'})`,
       type: 'checkbox',
       checked: settings.explainEnabled !== false,
       click: (item) => explainFeature.setEnabled(item.checked)
@@ -1345,35 +1345,36 @@ function registerShortcuts() {
     if (!pre) return;
     enqueueCapture(() => captureText(mode, null, pre));
   };
+  // CommandOrControl = Ctrl on Windows, Cmd on Mac, so one map serves both
   const shortcuts = {
-    'Ctrl+Shift+C': textCapture('append'),                               // Append text
-    'Ctrl+Shift+1': textCapture('h1'),                                   // Heading 1
-    'Ctrl+Shift+2': textCapture('h2'),                                   // Heading 2
-    'Ctrl+Shift+3': textCapture('h3'),                                   // Heading 3
-    'Ctrl+Shift+V': () => {                                              // Paste image
+    'CommandOrControl+Shift+C': textCapture('append'),                   // Append text
+    'CommandOrControl+Shift+1': textCapture('h1'),                       // Heading 1
+    'CommandOrControl+Shift+2': textCapture('h2'),                       // Heading 2
+    'CommandOrControl+Shift+3': textCapture('h3'),                       // Heading 3
+    'CommandOrControl+Shift+V': () => {                                  // Paste image
       const pre = preflightImage();
       if (!pre) return;
       const s = beginSourceStamp();
       enqueueCapture(() => captureImage(s, pre));
     },
-    'Ctrl+Shift+N': () => {                                              // New paragraph
+    'CommandOrControl+Shift+N': () => {                                  // New paragraph
       if (activeFilePath) showOverlayNotification('New Line Started', 'paragraph');
       enqueueCapture(() => newParagraph());
     },
-    'Ctrl+Shift+K': () => {                                              // Code block
+    'CommandOrControl+Shift+K': () => {                                  // Code block
       const pre = preflightCode();
       if (!pre) return;
       const s = beginSourceStamp();
       enqueueCapture(() => captureCodeBlock(s, pre));
     },
-    'Ctrl+Shift+Z': () => enqueueCapture(() => performUndo()),           // Undo
-    'Ctrl+Shift+Y': () => enqueueCapture(() => performRedo()),           // Redo
-    'Ctrl+Shift+H': () => toggleHelpOverlay(),      // Help
-    'Ctrl+Shift+Q': () => toggleQuickInput(),       // Quick note popup
-    'Ctrl+Shift+E': () => explainFeature.triggerExplain(), // Explain selection
-    'Ctrl+Shift+M': () => toggleRecording(),        // Voice Memo
-    'Ctrl+Shift+B': plainText('bold'),                                   // Bold
-    'Ctrl+Shift+I': plainText('italic'),                                 // Italic
+    'CommandOrControl+Shift+Z': () => enqueueCapture(() => performUndo()), // Undo
+    'CommandOrControl+Shift+Y': () => enqueueCapture(() => performRedo()), // Redo
+    'CommandOrControl+Shift+H': () => toggleHelpOverlay(),      // Help
+    'CommandOrControl+Shift+Q': () => toggleQuickInput(),       // Quick note popup
+    'CommandOrControl+Shift+E': () => explainFeature.triggerExplain(), // Explain selection
+    'CommandOrControl+Shift+M': () => toggleRecording(),        // Voice Memo
+    'CommandOrControl+Shift+B': plainText('bold'),                       // Bold
+    'CommandOrControl+Shift+I': plainText('italic'),                     // Italic
     'Alt+R': plainText('red'),                                           // Red Text
     'Alt+G': plainText('green'),                                         // Green Text
     'Alt+B': plainText('blue'),                                          // Blue Text
@@ -1385,11 +1386,11 @@ function registerShortcuts() {
     });
     console.log(`[Casrion] Shortcut ${key}: ${success ? 'registered' : 'FAILED'}`);
   }
-  // Another app may own Ctrl+Shift+E; the explain hotkey is too central to
-  // silently lose, so fall back to Ctrl+Alt+E
-  if (!globalShortcut.isRegistered('Ctrl+Shift+E')) {
-    const ok = globalShortcut.register('Ctrl+Alt+E', () => explainFeature.triggerExplain());
-    console.log(`[Casrion] Explain fallback Ctrl+Alt+E: ${ok ? 'registered' : 'FAILED'}`);
+  // Another app may own the explain hotkey; it is too central to silently
+  // lose, so fall back to the Alt variant
+  if (!globalShortcut.isRegistered('CommandOrControl+Shift+E')) {
+    const ok = globalShortcut.register('CommandOrControl+Alt+E', () => explainFeature.triggerExplain());
+    console.log(`[Casrion] Explain fallback CommandOrControl+Alt+E: ${ok ? 'registered' : 'FAILED'}`);
   }
 }
 

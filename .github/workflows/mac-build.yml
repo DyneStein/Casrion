@@ -1,0 +1,37 @@
+# Builds the macOS (Apple Silicon) DMG on a rented Mac runner, since mac
+# apps can only be built on macOS. Triggered by hand from the Actions tab
+# or `gh workflow run mac-build.yml`. The DMG lands as a workflow artifact.
+#
+# The build is unsigned for now (no Apple Developer account), so testers
+# must right-click > Open the app the first time, or run:
+#   xattr -cr /Applications/Casrion.app
+name: mac-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build DMG
+        run: npm run dist:mac
+        env:
+          # No signing cert in CI; electron-builder falls back to an ad-hoc
+          # signature, which arm64 macOS requires to launch at all
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Casrion-mac-arm64
+          path: dist-electron/*.dmg
+          if-no-files-found: error

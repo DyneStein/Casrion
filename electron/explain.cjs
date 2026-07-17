@@ -4,10 +4,13 @@
 // the selection-hook native addon (UI Automation), page context comes from
 // the title helper plus a quick OCR of the pixels around the selection.
 const path = require('path');
-const { BrowserWindow, screen, ipcMain } = require('electron');
+const { BrowserWindow, screen, ipcMain, systemPreferences } = require('electron');
 const llm = require('./llm.cjs');
 const ocr = require('./ocr.cjs');
 
+const IS_MAC = process.platform === 'darwin';
+// The gesture key: Ctrl on Windows, Cmd on Mac (uniKey follows MDN key values)
+const TAP_KEY = IS_MAC ? 'Meta' : 'Control';
 const INVALID_COORD = -99999;
 const WIN_W = 470;
 const WIN_H = 190;
@@ -82,8 +85,20 @@ function setEnabled(enabled) {
 
 // ── selection-hook ──────────────────────────────────────────
 
+let axPrompted = false;
+
 function initSelectionHook() {
-  if (!isEnabled() || process.platform !== 'win32') return;
+  if (!isEnabled() || (process.platform !== 'win32' && !IS_MAC)) return;
+  // On Mac the hook reads selections through the accessibility API, which
+  // needs a one-time user grant; the system prompt is shown once per run
+  // and later calls just re-check quietly until the user has granted it
+  if (IS_MAC) {
+    try {
+      const trusted = systemPreferences.isTrustedAccessibilityClient(!axPrompted);
+      axPrompted = true;
+      if (!trusted) return;
+    } catch { /* keep going, hook.start reports its own failure */ }
+  }
   if (hook) {
     try { if (!hook.isRunning()) hook.start({ enableClipboard: true }); } catch { /* keep old state */ }
     return;
@@ -108,33 +123,34 @@ function initSelectionHook() {
         hideExplain();
       }
     });
-    // Double-tap Ctrl triggers explain: one key, no chord to remember, and
-    // it collides with nothing because Ctrl alone does nothing anywhere.
-    // A tap only counts when Ctrl went down and back up with no other key
-    // in between, so Ctrl+C, Ctrl+V and held-Ctrl auto-repeat never fire it.
-    let ctrlDownAt = 0;       // 0 while Ctrl is up (also gates auto-repeat)
-    let ctrlTapDirty = false; // another key was pressed while Ctrl was held
+    // Double-tap Ctrl (Cmd on Mac) triggers explain: one key, no chord to
+    // remember, and it collides with nothing because the bare modifier does
+    // nothing anywhere. A tap only counts when the key went down and back up
+    // with no other key in between, so copy/paste chords and held-key
+    // auto-repeat never fire it.
+    let tapDownAt = 0;       // 0 while the key is up (also gates auto-repeat)
+    let tapDirty = false;    // another key was pressed while it was held
     let lastCleanTapUp = 0;
     hook.on('key-down', (e) => {
-      if (e.uniKey === 'Control') {
-        if (ctrlDownAt) return; // auto-repeat of a held Ctrl
-        ctrlDownAt = Date.now();
-        ctrlTapDirty = false;
-        if (lastCleanTapUp && ctrlDownAt - lastCleanTapUp < 400) {
+      if (e.uniKey === TAP_KEY) {
+        if (tapDownAt) return; // auto-repeat of a held modifier
+        tapDownAt = Date.now();
+        tapDirty = false;
+        if (lastCleanTapUp && tapDownAt - lastCleanTapUp < 400) {
           lastCleanTapUp = 0;
           triggerExplain();
         }
       } else {
-        ctrlTapDirty = true;
+        tapDirty = true;
         lastCleanTapUp = 0;
       }
     });
     hook.on('key-up', (e) => {
-      if (e.uniKey !== 'Control') return;
-      if (ctrlDownAt && !ctrlTapDirty && Date.now() - ctrlDownAt < 400) {
+      if (e.uniKey !== TAP_KEY) return;
+      if (tapDownAt && !tapDirty && Date.now() - tapDownAt < 400) {
         lastCleanTapUp = Date.now();
       }
-      ctrlDownAt = 0;
+      tapDownAt = 0;
     });
     hook.on('error', (err) => console.error('[Casrion] selection-hook:', err && err.message));
     hook.on('status', (s) => console.log('[Casrion] selection-hook status:', s));

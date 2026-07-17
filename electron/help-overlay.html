@@ -162,6 +162,10 @@
       <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">Y</span></div>
     </div>
     <div class="shortcut-row">
+      <span class="shortcut-action">Explain Selection (tap twice)</span>
+      <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Ctrl</span></div>
+    </div>
+    <div class="shortcut-row">
       <span class="shortcut-action">Toggle Help Menu</span>
       <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">H</span></div>
     </div>
@@ -170,6 +174,15 @@
   </div>
   <script>
     const { ipcRenderer } = require('electron');
+    // On a Mac every one of these shortcuts is Cmd-based, so swap the labels
+    if (process.platform === 'darwin') {
+      document.querySelectorAll('.key').forEach((k) => {
+        if (k.textContent === 'Ctrl') k.textContent = 'Cmd';
+      });
+      document.querySelectorAll('.section-label, .help-subtitle, .help-footer').forEach((el) => {
+        el.textContent = el.textContent.replace(/Ctrl/g, 'Cmd');
+      });
+    }
     // The dimmed area around the panel counts as "outside": clicking it closes.
     document.body.addEventListener('mousedown', (e) => {
       if (!e.target.closest('.help-panel')) ipcRenderer.send('help-overlay-hide');

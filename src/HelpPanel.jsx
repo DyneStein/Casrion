@@ -1,11 +1,15 @@
 import { X } from 'lucide-react';
 
+// The same shortcuts are Cmd-based on a Mac, so the help adapts its labels
+const IS_MAC = navigator.userAgent.includes('Mac');
+const MOD = IS_MAC ? 'Cmd' : 'Ctrl';
+
 function Shortcut({ keys, action }) {
   return (
     <div className="help-shortcut-row">
       <span className="help-shortcut-action">{action}</span>
       <span className="help-shortcut-keys">
-        {keys.split('+').map((k, i) => (
+        {keys.replaceAll('Ctrl', MOD).split('+').map((k, i) => (
           <span key={i}>
             {i > 0 && <span className="help-key-sep">+</span>}
             <kbd className="help-key">{k}</kbd>
@@ -44,14 +48,14 @@ function HelpPanel({ onClose }) {
               <li>Click <strong>Add Folder</strong> in the sidebar and pick any folder on your computer. This becomes a workspace.</li>
               <li>Click the <strong>+</strong> icon next to the folder name to create your first note.</li>
               <li>Minimize the window. The app keeps running in the system tray, near the clock.</li>
-              <li>Copy anything with Ctrl+C, then press a capture shortcut. A small confirmation appears at the bottom of the screen, and the text lands in your active note.</li>
+              <li>Copy anything with {MOD}+C, then press a capture shortcut. A small confirmation appears at the bottom of the screen, and the text lands in your active note.</li>
               <li>To delete a note, hover over it in the sidebar and click the trash icon. Deleted notes and folders go to the Recycle Bin, so you can always restore them.</li>
             </ol>
           </section>
 
           <section>
             <h2>Capture shortcuts</h2>
-            <p>Copy text first with Ctrl+C, then press:</p>
+            <p>Copy text first with {MOD}+C, then press:</p>
             <Shortcut keys="Ctrl+Shift+C" action="Add the copied text to your note" />
             <Shortcut keys="Ctrl+Shift+1" action="Add as a large heading" />
             <Shortcut keys="Ctrl+Shift+2" action="Add as a medium heading" />
@@ -78,8 +82,8 @@ function HelpPanel({ onClose }) {
             <Shortcut keys="Ctrl+Shift+Y" action="Redo what you just undid" />
             <Shortcut keys="Ctrl+Shift+H" action="Show or hide the quick shortcut overlay" />
             <p>
-              To capture a screenshot: press Win+Shift+S, snip the area you want, then press
-              Ctrl+Shift+V. The image is saved next to your note and appears inside it.
+              To capture a screenshot: press {IS_MAC ? 'Cmd+Shift+4' : 'Win+Shift+S'}, snip the area you want, then press
+              {' '}{MOD}+Shift+V. The image is saved next to your note and appears inside it.
             </p>
           </section>
 
@@ -88,17 +92,32 @@ function HelpPanel({ onClose }) {
             <Shortcut keys="Ctrl+Shift+Q" action="Open the quick note popup from anywhere" />
             <p>
               Sometimes you need to write something yourself, like a heading, a thought or
-              a reminder, without anything to copy. Press Ctrl+Shift+Q in any application
+              a reminder, without anything to copy. Press {MOD}+Shift+Q in any application
               and a small input appears on top of your work. Type, pick how it should land
               (plain text, heading, list item or quote, using the buttons at the top, or
-              Ctrl+1 through Ctrl+6), and press Enter. It goes straight into your active
+              {' '}{MOD}+1 through {MOD}+6), and press Enter. It goes straight into your active
               note and the popup disappears. To add several things in a row, press
-              Ctrl+Enter instead: the text is added and the popup stays open, ready for
+              {' '}{MOD}+Enter instead: the text is added and the popup stays open, ready for
               the next piece, so a heading, some text and a quote take three quick
               entries. You can also write it all at once: Shift+Enter starts a new line,
               and lines beginning with markdown such as #, - or &gt; land as a heading,
               a list item or a quote. Escape or clicking elsewhere closes the popup, and
               anything you had typed is kept as a draft for the next time you open it.
+            </p>
+          </section>
+
+          <section>
+            <h2>Explain anything, anywhere</h2>
+            <Shortcut keys={`${MOD}+${MOD}`} action="Explain whatever you have selected (tap twice)" />
+            <p>
+              Highlight a word, sentence or formula in any app, then quickly tap
+              {' '}{MOD} twice. A small popup appears next to your selection with a
+              plain-English explanation that understands the page you are reading.
+              It runs on a small AI model stored on your computer (a one-time
+              download of about 1.1 GB), so it works offline and nothing you read
+              ever leaves your machine. Switch between Quick and Detailed answers
+              in the popup, copy the answer, or save it straight into your note.
+              {' '}{MOD}+Shift+E does the same thing if you prefer a regular shortcut.
             </p>
           </section>
 
@@ -126,7 +145,7 @@ function HelpPanel({ onClose }) {
             <h2>Editing and exporting</h2>
             <p>
               The pencil button switches to edit mode, where you can rewrite anything with a
-              full formatting toolbar. In edit mode, Ctrl+F opens a search bar that highlights
+              full formatting toolbar. In edit mode, {MOD}+F opens a search bar that highlights
               every match in the note, Enter jumps to the next one, and Tab indents by four
               spaces. Voice memos appear as small labeled chips there; switch back to the
               reading view to play them. The download button exports the current note as a

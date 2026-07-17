@@ -164,11 +164,11 @@
       if (e.isComposing) return;
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        submit(e.ctrlKey);
+        submit(e.ctrlKey || e.metaKey);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         ipcRenderer.send('quick-input-hide');
-      } else if (e.ctrlKey && !e.altKey && e.key >= '1' && e.key <= '6') {
+      } else if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key >= '1' && e.key <= '6') {
         e.preventDefault();
         setMode(MODE_ORDER[Number(e.key) - 1]);
       }

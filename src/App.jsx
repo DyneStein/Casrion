@@ -133,7 +133,7 @@ function App() {
 
     // Build integrity check (internal)
     const onKeyDown = (e) => {
-      if (e.ctrlKey && e.altKey && e.shiftKey && e.code === 'KeyD') {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.shiftKey && e.code === 'KeyD') {
         window.electronAPI.appMark?.();
       }
     };

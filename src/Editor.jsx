@@ -221,7 +221,7 @@ function Editor({ content, onContentChange }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         setFindOpen(true);
         setTimeout(() => {

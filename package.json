@@ -15,6 +15,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "dist": "vite build && node scripts/obfuscate.cjs && electron-builder --win -c.directories.output=%LOCALAPPDATA%\\casrion-dist",
+    "dist:mac": "vite build && node scripts/obfuscate.cjs && electron-builder --mac",
     "build:electron": "vite build && node scripts/obfuscate.cjs && electron-builder --win -c.directories.output=%LOCALAPPDATA%\\casrion-dist"
   },
   "build": {
@@ -30,13 +31,7 @@
       {
         "from": "electron-obf",
         "to": "electron"
-      },
-      "!**/node_modules/@node-llama-cpp/win-x64-cuda/**",
-      "!**/node_modules/@node-llama-cpp/win-x64-cuda-ext/**",
-      "!**/node_modules/@node-llama-cpp/win-arm64/**",
-      "!**/node_modules/selection-hook/prebuilds/darwin-*/**",
-      "!**/node_modules/selection-hook/prebuilds/linux-*/**",
-      "!**/node_modules/selection-hook/prebuilds/win32-arm64/**"
+      }
     ],
     "npmRebuild": false,
     "asarUnpack": [
@@ -54,7 +49,37 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Casrion-Setup-${version}.${ext}"
+      "artifactName": "Casrion-Setup-${version}.${ext}",
+      "files": [
+        "!**/node_modules/@node-llama-cpp/win-x64-cuda/**",
+        "!**/node_modules/@node-llama-cpp/win-x64-cuda-ext/**",
+        "!**/node_modules/@node-llama-cpp/win-arm64/**",
+        "!**/node_modules/selection-hook/prebuilds/darwin-*/**",
+        "!**/node_modules/selection-hook/prebuilds/linux-*/**",
+        "!**/node_modules/selection-hook/prebuilds/win32-arm64/**"
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon_512.png",
+      "category": "public.app-category.productivity",
+      "minimumSystemVersion": "11.0",
+      "artifactName": "Casrion-${version}-arm64.${ext}",
+      "files": [
+        "!**/node_modules/@node-llama-cpp/win-*/**",
+        "!**/node_modules/@node-llama-cpp/linux-*/**",
+        "!**/node_modules/@node-llama-cpp/mac-x64/**",
+        "!**/node_modules/selection-hook/prebuilds/win32-*/**",
+        "!**/node_modules/selection-hook/prebuilds/linux-*/**",
+        "!**/node_modules/selection-hook/prebuilds/darwin-x64/**"
+      ]
     },
     "nsis": {
       "oneClick": false,
