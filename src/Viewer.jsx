@@ -104,14 +104,19 @@ function AudioNote({ node: _node, src, ...props }) {
     const el = audioRef.current;
     if (!el) return;
 
+    // MediaRecorder webm/mp4 carries no duration in its header, so the player
+    // reports Infinity until it is forced to seek to the end. Seeking only
+    // works once the bytes are actually buffered, which is why local memos
+    // preload in full (see the element below). Wrapped so a rejected seek on
+    // any platform can never bubble into the error-retry path.
     const fixDuration = () => {
       if (el.duration === Infinity || Number.isNaN(el.duration)) {
         const rewind = () => {
-          el.currentTime = 0;
+          try { el.currentTime = 0; } catch { /* nothing to rewind yet */ }
           el.removeEventListener('seeked', rewind);
         };
         el.addEventListener('seeked', rewind);
-        el.currentTime = 1e101;
+        try { el.currentTime = 1e101; } catch { /* seek unsupported until buffered */ }
       }
     };
     const handleLoaded = () => {
@@ -145,7 +150,10 @@ function AudioNote({ node: _node, src, ...props }) {
     setAttempt(attemptRef.current);
   };
 
-  return <audio {...props} src={url} ref={audioRef} controls preload="metadata" onClick={handleClick} />;
+  // Local recordings preload fully: they are small, and a whole-file buffer
+  // is what lets an index-less webm compute its duration and seek instantly.
+  // Remote/other sources keep the lighter metadata preload.
+  return <audio {...props} src={url} ref={audioRef} controls preload={isLocal ? 'auto' : 'metadata'} onClick={handleClick} />;
 }
 
 // Stable plugin references so the memoized block renderer's props never

@@ -492,18 +492,34 @@ function createWindow() {
   });
 
   mainWindow.on('close', (event) => {
-    if (!app.isQuiting) {
-      event.preventDefault();
-      mainWindow.hide();
-      // First time only: tell the user where the app went — the tray icon
-      // often lands in the hidden overflow area and is easy to miss.
+    if (app.isQuiting) return;
+    // macOS: hiding a frameless window here leaves a black, unresponsive
+    // ghost window (a known compositor bug), so let the window close for
+    // real. The app keeps running (menu-bar icon + the hidden helper
+    // windows), and reopening rebuilds a fresh window that reloads state
+    // from disk. Windows/Linux keep the hide-to-tray behavior.
+    if (process.platform === 'darwin') {
       if (!settings.trayNoticeShown) {
         settings.trayNoticeShown = true;
         saveSettings();
-        showOverlayNotification(`Casrion is minimized to the ${process.platform === 'darwin' ? 'menu bar' : 'system tray'}`, 'text', 5000);
+        showOverlayNotification('Casrion is still running in the menu bar', 'text', 5000);
       }
+      return; // do not preventDefault: allow the destroy
+    }
+    event.preventDefault();
+    mainWindow.hide();
+    // First time only: tell the user where the app went — the tray icon
+    // often lands in the hidden overflow area and is easy to miss.
+    if (!settings.trayNoticeShown) {
+      settings.trayNoticeShown = true;
+      saveSettings();
+      showOverlayNotification('Casrion is minimized to the system tray', 'text', 5000);
     }
   });
+
+  // On macOS the window is really destroyed on close; drop the reference so
+  // the tray/dock handlers know to rebuild it on next open.
+  mainWindow.on('closed', () => { mainWindow = null; });
 
   // Parked in the tray the renderer needs no frames or fast timers — let
   // Chromium throttle it to near-idle so a hidden Casrion costs as little
@@ -526,6 +542,19 @@ function createWindow() {
       mainWindow.webContents.reload();
     }
   });
+}
+
+// Bring the main window forward from the tray/dock. On macOS the window may
+// have been destroyed on close, so rebuild it; otherwise just restore, show
+// and focus the existing one.
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function createOverlayWindow() {
@@ -757,7 +786,7 @@ function setStampSource(enabled) {
 function refreshTrayMenu() {
   if (!tray) return;
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open Casrion', click: () => { mainWindow.show(); mainWindow.focus(); } },
+    { label: 'Open Casrion', click: () => showMainWindow() },
     { type: 'separator' },
     {
       label: 'Add source to captures',
@@ -790,7 +819,7 @@ function createTray() {
   }
   tray.setToolTip('Casrion');
   refreshTrayMenu();
-  tray.on('click', () => { mainWindow.show(); mainWindow.focus(); });
+  tray.on('click', () => showMainWindow());
 }
 
 // ─── Source stamps (opt-in): who/where a capture came from ────
@@ -2034,9 +2063,9 @@ app.whenReady().then(() => {
   mainWindow.once('show', () => setTimeout(warmSecondaryWindows, 1500));
   setTimeout(warmSecondaryWindows, 6000); // fallback if the window stays hidden
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  // Dock-icon click on macOS: the hidden helper windows mean getAllWindows()
+  // is never empty, so rebuild/show the main window explicitly instead.
+  app.on('activate', () => showMainWindow());
 });
 
 app.on('window-all-closed', () => { /* Keep running in tray */ });
