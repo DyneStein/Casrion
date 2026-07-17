@@ -192,7 +192,10 @@ function createExplainWindow() {
     width: WIN_W,
     height: WIN_H,
     transparent: true,
+    // Stops macOS flashing the frameless window solid black before paint
+    backgroundColor: '#00000000',
     frame: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -204,6 +207,11 @@ function createExplainWindow() {
     }
   });
   explainWindow.setAlwaysOnTop(true, 'screen-saver');
+  // macOS pins screen-saver-level windows to one Space and hides them behind
+  // fullscreen apps; float over all Spaces so the popup lands where the user is
+  if (IS_MAC) {
+    try { explainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch { /* older macOS */ }
+  }
   explainWindow.loadFile(path.join(__dirname, 'explain-overlay.html'));
   // Shown inactive, so this only fires after the user clicked into the
   // popup (to copy text) and then clicked away

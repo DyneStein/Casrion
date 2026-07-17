@@ -156,6 +156,12 @@ body {
   user-select: none;
 }
 
+/* macOS traffic lights sit top-left, so clear the left edge instead of the
+   right, and drop the Windows control-strip padding on the right. */
+body.platform-mac .header {
+  padding: 0 0.9rem 0 78px;
+}
+
 .header-left {
   display: flex; align-items: center; gap: 0.55rem;
   min-width: 0;

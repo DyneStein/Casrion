@@ -74,6 +74,9 @@
       "category": "public.app-category.productivity",
       "minimumSystemVersion": "11.0",
       "artifactName": "Casrion-${version}-arm64.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Casrion records voice memos into your notes when you use the voice memo shortcut."
+      },
       "files": [
         "!**/node_modules/@node-llama-cpp/win-*/**",
         "!**/node_modules/@node-llama-cpp/linux-*/**",

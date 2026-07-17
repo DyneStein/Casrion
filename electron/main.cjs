@@ -1,4 +1,13 @@
-const { app, BrowserWindow, globalShortcut, clipboard, Tray, Menu, ipcMain, nativeImage, dialog, protocol, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, clipboard, Tray, Menu, ipcMain, nativeImage, dialog, protocol, shell, systemPreferences } = require('electron');
+
+// The capture shortcuts are Ctrl-based on Windows and Cmd-based on macOS;
+// user-facing strings pick the right word.
+const MOD_LABEL = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
+// How each OS puts a screenshot on the clipboard (macOS defaults to saving a
+// file; adding Ctrl copies it instead), shown when the clipboard has no image.
+const SCREENSHOT_HINT = process.platform === 'darwin'
+  ? 'Take a screenshot to the clipboard first (Ctrl+Cmd+Shift+4)'
+  : 'Take a screenshot first (Win+Shift+S)';
 const path = require('path');
 const fs = require('fs');
 const { Readable } = require('stream');
@@ -428,10 +437,14 @@ function createWindow() {
     title: 'Casrion',
     backgroundColor: '#110e0d',
     // Desktop-app chrome: the renderer's slim header doubles as the title
-    // bar (drag region in CSS) and Windows draws its own minimize/maximize/
-    // close controls on top of it.
+    // bar (drag region in CSS). On Windows we draw our own minimize/maximize/
+    // close controls (titleBarOverlay) over it; on macOS the native traffic
+    // lights stay, vertically centered in the 40px header, and the renderer
+    // pads its left edge (body.platform-mac) so nothing sits under them.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#e6dbc5', symbolColor: '#5f5344', height: 40 },
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 13, y: 13 } }
+      : { titleBarOverlay: { color: '#e6dbc5', symbolColor: '#5f5344', height: 40 } }),
     show: false
   });
 
@@ -487,7 +500,7 @@ function createWindow() {
       if (!settings.trayNoticeShown) {
         settings.trayNoticeShown = true;
         saveSettings();
-        showOverlayNotification('Casrion is minimized to the system tray', 'text', 5000);
+        showOverlayNotification(`Casrion is minimized to the ${process.platform === 'darwin' ? 'menu bar' : 'system tray'}`, 'text', 5000);
       }
     }
   });
@@ -528,7 +541,11 @@ function createOverlayWindow() {
     x: Math.floor(width / 2 - 320), // Center horizontally
     y: height - 120, // Bottom placement
     transparent: true,
+    // A fully transparent backing color stops macOS painting the frameless
+    // window solid black before the web content's first paint.
+    backgroundColor: '#00000000',
     frame: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,
@@ -544,7 +561,17 @@ function createOverlayWindow() {
   // Make it fully click-through
   overlayWindow.setIgnoreMouseEvents(true);
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  floatOverEverything(overlayWindow);
   overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));
+}
+
+// macOS treats a 'screen-saver'-level window as tied to the Space it opened
+// on and hides it behind fullscreen apps, which looked like the overlay
+// "opening on another window". Pinning it to all Spaces (including over
+// fullscreen) makes it float above wherever the user actually is.
+function floatOverEverything(win) {
+  if (process.platform !== 'darwin') return;
+  try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch { /* older macOS */ }
 }
 
 function createHelpOverlay() {
@@ -558,7 +585,9 @@ function createHelpOverlay() {
     x: Math.floor(width / 2 - 240),
     y: Math.floor(height / 2 - 290),
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
@@ -571,6 +600,8 @@ function createHelpOverlay() {
     }
   });
 
+  helpOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  floatOverEverything(helpOverlayWindow);
   helpOverlayWindow.loadFile(path.join(__dirname, 'help-overlay.html'));
 
   // Clicking anywhere outside the overlay (another window, the desktop)
@@ -589,7 +620,9 @@ function createQuickInputWindow() {
     width: 600,
     height: 210,
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -601,6 +634,7 @@ function createQuickInputWindow() {
     }
   });
   quickInputWindow.setAlwaysOnTop(true, 'screen-saver');
+  floatOverEverything(quickInputWindow);
   quickInputWindow.loadFile(path.join(__dirname, 'quick-input.html'));
 
   // Clicking anywhere else cancels; the typed draft is kept for next time
@@ -1064,7 +1098,7 @@ function preflightText(mode) {
   }
 
   if ((!rawText || rawText.trim().length === 0) && !hasHtml) {
-    showOverlayNotification('Clipboard is empty. Copy text first (Ctrl+C)', 'error');
+    showOverlayNotification(`Clipboard is empty. Copy text first (${MOD_LABEL}+C)`, 'error');
     return null;
   }
   const previewLine = (rawText || '').trim().split('\n')[0];
@@ -1094,7 +1128,7 @@ async function captureText(mode = 'append', pendingStamp = null, pre = null) {
   const rawHtml = p.hasHtml ? clipboard.readHTML() : '';
   const { content, structured } = normalizeCapture(p.rawText, rawHtml);
   if (!content) {
-    showOverlayNotification('Clipboard is empty. Copy text first (Ctrl+C)', 'error');
+    showOverlayNotification(`Clipboard is empty. Copy text first (${MOD_LABEL}+C)`, 'error');
     return;
   }
 
@@ -1123,7 +1157,7 @@ function preflightImage() {
     return null;
   }
   if (!clipboard.availableFormats().some((f) => f.startsWith('image/'))) {
-    showOverlayNotification('No image in clipboard. Take a screenshot first (Win+Shift+S)', 'error');
+    showOverlayNotification(`No image in clipboard. ${SCREENSHOT_HINT}`, 'error');
     return null;
   }
   showOverlayNotification('Image Saved', 'image');
@@ -1161,7 +1195,7 @@ async function captureImage(pendingStamp = null, pre = null) {
     console.log('[Casrion] Captured image:', filename, 'at line', insertionLine);
     notifyRendererFileUpdated();
   } else {
-    showOverlayNotification('No image in clipboard. Take a screenshot first (Win+Shift+S)', 'error');
+    showOverlayNotification(`No image in clipboard. ${SCREENSHOT_HINT}`, 'error');
   }
 }
 
@@ -1200,7 +1234,7 @@ function preflightCode() {
   }
   const text = clipboard.readText();
   if (!text || text.trim().length === 0) {
-    showOverlayNotification('Clipboard is empty. Copy code first (Ctrl+C)', 'error');
+    showOverlayNotification(`Clipboard is empty. Copy code first (${MOD_LABEL}+C)`, 'error');
     return null;
   }
   showOverlayNotification('Code Block Added', 'code');
@@ -1250,7 +1284,7 @@ function toggleHelpOverlay() {
 }
 
 // ─── Voice Recording ───────────────────────────────────────
-function toggleRecording() {
+async function toggleRecording() {
   if (!activeFilePath) {
     showOverlayNotification('No file selected!', 'error');
     return;
@@ -1263,12 +1297,28 @@ function toggleRecording() {
 
   isRecording = !isRecording;
   if (isRecording) {
+    // macOS gates the microphone behind a system permission (TCC). Ask for it
+    // before the renderer's getUserMedia call, which would otherwise fail
+    // silently the very first time until the user granted access elsewhere.
+    if (process.platform === 'darwin') {
+      try {
+        const status = systemPreferences.getMediaAccessStatus('microphone');
+        if (status !== 'granted') {
+          const ok = await systemPreferences.askForMediaAccess('microphone');
+          if (!ok) {
+            isRecording = false;
+            showOverlayNotification('Microphone access is off. Enable it in System Settings > Privacy > Microphone', 'error', 5000);
+            return;
+          }
+        }
+      } catch { /* older macOS without the API: fall through and try anyway */ }
+    }
     console.log('[Casrion] Starting voice recording...');
     // The recorder lives in the (possibly hidden and throttled) main window
     // renderer — wake it to full speed for the duration of the recording.
     mainWindow.webContents.setBackgroundThrottling(false);
     mainWindow.webContents.send('start-recording');
-    showOverlayNotification('Recording... (Press Ctrl+Shift+M to stop)', 'mic', 0);
+    showOverlayNotification(`Recording... (Press ${MOD_LABEL}+Shift+M to stop)`, 'mic', 0);
   } else {
     console.log('[Casrion] Stopping voice recording...');
     mainWindow.webContents.send('stop-recording');
@@ -1866,7 +1916,12 @@ app.whenReady().then(() => {
   protocol.handle('casrion', async (request) => {
     try {
       const u = new URL(request.url);
-      const filePath = path.normalize(decodeURIComponent(u.host + ':' + u.pathname));
+      // Windows paths carry a drive letter in the URL host ("casrion://c/Users/..."
+      // → host "c", so rebuild "c:/Users/..."). macOS and Linux absolute paths
+      // have an empty host ("casrion:///Users/..."), so the pathname is the path.
+      const filePath = path.normalize(decodeURIComponent(
+        u.host ? u.host + ':' + u.pathname : u.pathname
+      ));
 
       // Only serve files that live inside a workspace folder — this scheme
       // must not be a read-anything-on-disk primitive for rendered HTML.
