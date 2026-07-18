@@ -162,4 +162,16 @@
     if (qCursor) qCursor.classList.remove('on');
   }
 
+  // macOS: relabel the shortcut keys. Most just swap Ctrl -> Cmd; the few that
+  // differ (because their Cmd+Shift form clashes with a reserved macOS system
+  // shortcut) carry a data-mac attribute with the real sequence.
+  var isMac = /Mac/.test(navigator.platform) || /Mac/i.test(navigator.userAgent);
+  if (isMac) {
+    document.querySelectorAll('kbd, .fn-key').forEach(function (el) {
+      var mac = el.getAttribute('data-mac');
+      el.textContent = mac ? mac : el.textContent.replace(/Ctrl/g, 'Cmd');
+    });
+    document.querySelectorAll('.kbd-mac-note').forEach(function (el) { el.hidden = false; });
+  }
+
 })();
