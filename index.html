@@ -426,6 +426,13 @@
           <li class="setup-step">
             <span class="setup-num mono">06</span>
             <div class="setup-body">
+              <h3>Say yes to the browser question &mdash; for source stamps</h3>
+              <p>The first time you capture something from Safari or Chrome, macOS asks &ldquo;Casrion wants access to control Safari&rdquo;. Click <b>Allow</b>. That is how your notes get stamped with the exact page they came from. If you decline, captures still note which app they came from, just without the web address.</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">07</span>
+            <div class="setup-body">
               <h3>Quit and reopen once</h3>
               <p>After turning on any permission above, fully quit Casrion from the menu-bar icon and open it again so macOS applies the change. You only do this at setup.</p>
             </div>
@@ -481,6 +488,10 @@
       <details class="qa reveal" style="--i:8">
         <summary><span class="qa-num mono">A.9</span>On Mac, Explain says it needs permission, or the double-tap Cmd does nothing.</summary>
         <p>Explain uses two separate macOS permissions. <b>Accessibility</b> lets it read your highlighted text (needed for <span class="mono">Cmd+Shift+E</span> and the double-tap). <b>Input Monitoring</b> lets it notice the double-tap of the Cmd key. Turn Casrion on under <b>System Settings &rarr; Privacy &amp; Security</b> for each, then quit and reopen Casrion. If you only grant Accessibility, <span class="mono">Cmd+Shift+E</span> still works fine. The Casrion menu-bar icon has an &ldquo;Explain permissions&rdquo; shortcut to the exact panes.</p>
+      </details>
+      <details class="qa reveal" style="--i:9">
+        <summary><span class="qa-num mono">A.10</span>I updated Casrion on my Mac and a permission stopped working.</summary>
+        <p>macOS ties those permissions to the exact copy of the app, so after replacing Casrion with a newer version the old checkmarks can quietly stop counting even though they still look on. The fix takes a minute: in <b>System Settings &rarr; Privacy &amp; Security</b>, open <b>Accessibility</b> and <b>Input Monitoring</b>, remove Casrion from the list with the <b>&minus;</b> button, add it back with <b>+</b> (it lives in Applications), then quit and reopen the app.</p>
       </details>
     </section>
 
