@@ -1498,12 +1498,25 @@ function registerShortcuts() {
     if (!pre) return;
     enqueueCapture(() => captureText(mode, null, pre));
   };
-  // CommandOrControl = Ctrl on Windows, Cmd on Mac, so one map serves both
+  // CommandOrControl = Ctrl on Windows, Cmd on Mac, so one map serves both.
+  // A few Cmd+Shift combos collide with reserved macOS system shortcuts that
+  // an app cannot override, so those get macOS-specific accelerators:
+  //   Cmd+Shift+3  = system screenshot   -> Heading 3 uses Cmd+Ctrl+3
+  //   Cmd+Shift+Q  = system Log Out       -> Quick note uses Cmd+Shift+J (Jot)
+  //   Option+R/G/B = type special glyphs  -> Colors use Cmd+Ctrl+R/G/B
+  const isMac = process.platform === 'darwin';
+  const KEY = {
+    h3: isMac ? 'Command+Control+3' : 'CommandOrControl+Shift+3',
+    quick: isMac ? 'Command+Shift+J' : 'CommandOrControl+Shift+Q',
+    red: isMac ? 'Command+Control+R' : 'Alt+R',
+    green: isMac ? 'Command+Control+G' : 'Alt+G',
+    blue: isMac ? 'Command+Control+B' : 'Alt+B'
+  };
   const shortcuts = {
     'CommandOrControl+Shift+C': textCapture('append'),                   // Append text
     'CommandOrControl+Shift+1': textCapture('h1'),                       // Heading 1
     'CommandOrControl+Shift+2': textCapture('h2'),                       // Heading 2
-    'CommandOrControl+Shift+3': textCapture('h3'),                       // Heading 3
+    [KEY.h3]: textCapture('h3'),                                         // Heading 3
     'CommandOrControl+Shift+V': () => {                                  // Paste image
       const pre = preflightImage();
       if (!pre) return;
@@ -1523,14 +1536,14 @@ function registerShortcuts() {
     'CommandOrControl+Shift+Z': () => enqueueCapture(() => performUndo()), // Undo
     'CommandOrControl+Shift+Y': () => enqueueCapture(() => performRedo()), // Redo
     'CommandOrControl+Shift+H': () => toggleHelpOverlay(),      // Help
-    'CommandOrControl+Shift+Q': () => toggleQuickInput(),       // Quick note popup
+    [KEY.quick]: () => toggleQuickInput(),                      // Quick note popup
     'CommandOrControl+Shift+E': () => explainFeature.triggerExplain(), // Explain selection
     'CommandOrControl+Shift+M': () => toggleRecording(),        // Voice Memo
     'CommandOrControl+Shift+B': plainText('bold'),                       // Bold
     'CommandOrControl+Shift+I': plainText('italic'),                     // Italic
-    'Alt+R': plainText('red'),                                           // Red Text
-    'Alt+G': plainText('green'),                                         // Green Text
-    'Alt+B': plainText('blue'),                                          // Blue Text
+    [KEY.red]: plainText('red'),                                         // Red Text
+    [KEY.green]: plainText('green'),                                     // Green Text
+    [KEY.blue]: plainText('blue')                                        // Blue Text
   };
   for (const [key, handler] of Object.entries(shortcuts)) {
     const success = globalShortcut.register(key, () => {

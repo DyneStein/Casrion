@@ -1,15 +1,23 @@
 import { X } from 'lucide-react';
 
-// The same shortcuts are Cmd-based on a Mac, so the help adapts its labels
+// The same shortcuts are Cmd-based on a Mac, so the help adapts its labels.
 const IS_MAC = navigator.userAgent.includes('Mac');
 const MOD = IS_MAC ? 'Cmd' : 'Ctrl';
+
+// Resolve a shortcut for the current platform. By default the Windows string
+// just swaps Ctrl->Cmd on a Mac; pass an explicit mac string for the few that
+// differ because they would clash with a reserved macOS system shortcut.
+function keysFor(win, mac) {
+  if (IS_MAC) return mac || win.replaceAll('Ctrl', 'Cmd');
+  return win;
+}
 
 function Shortcut({ keys, action }) {
   return (
     <div className="help-shortcut-row">
       <span className="help-shortcut-action">{action}</span>
       <span className="help-shortcut-keys">
-        {keys.replaceAll('Ctrl', MOD).split('+').map((k, i) => (
+        {keys.split('+').map((k, i) => (
           <span key={i}>
             {i > 0 && <span className="help-key-sep">+</span>}
             <kbd className="help-key">{k}</kbd>
@@ -56,16 +64,16 @@ function HelpPanel({ onClose }) {
           <section>
             <h2>Capture shortcuts</h2>
             <p>Copy text first with {MOD}+C, then press:</p>
-            <Shortcut keys="Ctrl+Shift+C" action="Add the copied text to your note" />
-            <Shortcut keys="Ctrl+Shift+1" action="Add as a large heading" />
-            <Shortcut keys="Ctrl+Shift+2" action="Add as a medium heading" />
-            <Shortcut keys="Ctrl+Shift+3" action="Add as a small heading" />
-            <Shortcut keys="Ctrl+Shift+K" action="Add as a code block" />
-            <Shortcut keys="Ctrl+Shift+B" action="Add as bold text" />
-            <Shortcut keys="Ctrl+Shift+I" action="Add as italic text" />
-            <Shortcut keys="Alt+R" action="Add as red text" />
-            <Shortcut keys="Alt+G" action="Add as green text" />
-            <Shortcut keys="Alt+B" action="Add as blue text" />
+            <Shortcut keys={keysFor('Ctrl+Shift+C')} action="Add the copied text to your note" />
+            <Shortcut keys={keysFor('Ctrl+Shift+1')} action="Add as a large heading" />
+            <Shortcut keys={keysFor('Ctrl+Shift+2')} action="Add as a medium heading" />
+            <Shortcut keys={keysFor('Ctrl+Shift+3', 'Cmd+Ctrl+3')} action="Add as a small heading" />
+            <Shortcut keys={keysFor('Ctrl+Shift+K')} action="Add as a code block" />
+            <Shortcut keys={keysFor('Ctrl+Shift+B')} action="Add as bold text" />
+            <Shortcut keys={keysFor('Ctrl+Shift+I')} action="Add as italic text" />
+            <Shortcut keys={keysFor('Alt+R', 'Cmd+Ctrl+R')} action="Add as red text" />
+            <Shortcut keys={keysFor('Alt+G', 'Cmd+Ctrl+G')} action="Add as green text" />
+            <Shortcut keys={keysFor('Alt+B', 'Cmd+Ctrl+B')} action="Add as blue text" />
             <p>
               Captures from websites keep their structure: lists stay lists, tables stay
               tables, and mathematical formulas are preserved exactly. Copying cells from
@@ -75,12 +83,12 @@ function HelpPanel({ onClose }) {
 
           <section>
             <h2>Images, voice and more</h2>
-            <Shortcut keys="Ctrl+Shift+V" action="Insert the image or screenshot on your clipboard" />
-            <Shortcut keys="Ctrl+Shift+M" action="Start or stop a voice memo" />
-            <Shortcut keys="Ctrl+Shift+N" action="Start a new paragraph" />
-            <Shortcut keys="Ctrl+Shift+Z" action="Undo the last capture" />
-            <Shortcut keys="Ctrl+Shift+Y" action="Redo what you just undid" />
-            <Shortcut keys="Ctrl+Shift+H" action="Show or hide the quick shortcut overlay" />
+            <Shortcut keys={keysFor('Ctrl+Shift+V')} action="Insert the image or screenshot on your clipboard" />
+            <Shortcut keys={keysFor('Ctrl+Shift+M')} action="Start or stop a voice memo" />
+            <Shortcut keys={keysFor('Ctrl+Shift+N')} action="Start a new paragraph" />
+            <Shortcut keys={keysFor('Ctrl+Shift+Z')} action="Undo the last capture" />
+            <Shortcut keys={keysFor('Ctrl+Shift+Y')} action="Redo what you just undid" />
+            <Shortcut keys={keysFor('Ctrl+Shift+H')} action="Show or hide the quick shortcut overlay" />
             <p>
               To capture a screenshot: press {IS_MAC ? 'Cmd+Shift+4' : 'Win+Shift+S'}, snip the area you want, then press
               {' '}{MOD}+Shift+V. The image is saved next to your note and appears inside it.
@@ -89,10 +97,10 @@ function HelpPanel({ onClose }) {
 
           <section>
             <h2>Typing without opening the app</h2>
-            <Shortcut keys="Ctrl+Shift+Q" action="Open the quick note popup from anywhere" />
+            <Shortcut keys={keysFor('Ctrl+Shift+Q', 'Cmd+Shift+J')} action="Open the quick note popup from anywhere" />
             <p>
               Sometimes you need to write something yourself, like a heading, a thought or
-              a reminder, without anything to copy. Press {MOD}+Shift+Q in any application
+              a reminder, without anything to copy. Press {IS_MAC ? 'Cmd+Shift+J' : 'Ctrl+Shift+Q'} in any application
               and a small input appears on top of your work. Type, pick how it should land
               (plain text, heading, list item or quote, using the buttons at the top, or
               {' '}{MOD}+1 through {MOD}+6), and press Enter. It goes straight into your active
