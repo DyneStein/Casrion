@@ -775,7 +775,10 @@ function insertTypedText(rawText, mode) {
 function setStampSource(enabled) {
   settings.stampSource = !!enabled;
   saveSettings();
-  if (settings.stampSource) { startTitleHelper(); getForegroundSourceInfo(5000); } else { stopTitleHelper(); }
+  // The throwaway lookup only exists to warm the Windows PowerShell helper.
+  // On macOS it would spawn osascript and could pop an out-of-context
+  // Automation prompt, so the first real capture does the work there.
+  if (settings.stampSource) { startTitleHelper(); if (process.platform === 'win32') getForegroundSourceInfo(5000); } else { stopTitleHelper(); }
   lastStamp = { title: null, file: null };
   refreshTrayMenu();
   // The tray and the window paperclip both toggle this — push the new state
@@ -972,21 +975,31 @@ function stopTitleHelper() {
 function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true) {
   // Explain lookups need the helper even when source stamping is off
   if (!settings.stampSource && !force) return Promise.resolve(null);
-  // macOS has no PowerShell/UI-Automation helper. Reuse the explain selection
-  // hook (already holds Accessibility) to name the app the capture came from,
-  // and for a front browser ask it for the page URL via AppleScript. The URL
-  // step is skipped for explain (wantUrl=false): it spawns osascript and would
-  // trigger a per-browser Automation prompt the explain flow does not need.
+  // macOS has no PowerShell/UI-Automation helper. The frontmost app is named
+  // by lsappinfo (stock tool, zero permissions); the explain hook's app name
+  // is only a fast path / fallback, because it needs an Accessibility
+  // selection read that regularly comes back empty. For a front browser the
+  // page URL is asked via AppleScript. The URL step is skipped for explain
+  // (wantUrl=false): it spawns osascript and would trigger a per-browser
+  // Automation prompt the explain flow does not need.
   if (process.platform === 'darwin') {
-    let app = '';
-    try { app = explainFeature.getForegroundAppName(); } catch { app = ''; }
-    if (!app) return Promise.resolve(null);
-    const base = { title: '', proc: app.toLowerCase(), app, url: '' };
-    const script = wantUrl ? macBrowserUrlScript(app) : null;
-    if (!script) return Promise.resolve(base);
-    // A normal read is ~100-200ms; the cap keeps the stamp from waiting on a
-    // first-time Automation prompt (that capture just goes out without a URL).
-    return getMacBrowserUrl(script, 900).then((url) => ({ ...base, url: url || '' }));
+    let hookApp = '';
+    try { hookApp = explainFeature.getForegroundAppName(); } catch { hookApp = ''; }
+    // Explain wants the app the selection came from, which is exactly what
+    // the hook just read - answer instantly, no child process.
+    if (!wantUrl && hookApp) {
+      return Promise.resolve({ title: '', proc: hookApp.toLowerCase(), app: hookApp, url: '' });
+    }
+    return getMacFrontAppName(Math.min(timeoutMs, 800)).then((front) => {
+      const app = front || hookApp;
+      if (!app) return null;
+      const base = { title: '', proc: app.toLowerCase(), app, url: '' };
+      const script = wantUrl ? macBrowserUrlScript(app) : null;
+      if (!script) return base;
+      // A normal read is ~100-200ms; the cap keeps the stamp from waiting on a
+      // first-time Automation prompt (that capture just goes out without a URL).
+      return getMacBrowserUrl(script, 900).then((url) => ({ ...base, url: url || '' }));
+    });
   }
   startTitleHelper();
   if (!titleHelper) return Promise.resolve(null);
@@ -1005,20 +1018,48 @@ function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true
   });
 }
 
+// Name the frontmost app via lsappinfo, a stock macOS tool that needs no
+// privacy permission at all. This is what makes source stamping work even
+// when Accessibility is missing or the front app hides its selection.
+function getMacFrontAppName(timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    let child;
+    try {
+      child = spawn('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'],
+        { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch { return finish(''); }
+    let out = '';
+    const timer = setTimeout(() => { try { child.kill(); } catch { /* gone */ } finish(''); }, timeoutMs);
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.on('error', () => { clearTimeout(timer); finish(''); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      // Output shape: "name"="Safari" (older builds may drop the key quotes)
+      const m = /"?name"?\s*=\s*"([^"]*)"/.exec(out) || /=\s*"([^"]*)"\s*$/.exec(out.trim());
+      finish(m && m[1] ? m[1].trim() : '');
+    });
+  });
+}
+
 // AppleScript that returns the front tab's URL for a known browser, or null
 // for anything else. Safari and the Chromium family expose it differently.
+// Matching is exact-name (not substring): "tell application" LAUNCHES the
+// target if it is not running, so a fuzzy match against an app that merely
+// contains "arc" or "edge" in its name would open a browser mid-capture.
+// The script targets the app's own name, which also reaches Beta/Canary
+// builds ("Google Chrome Beta" is its own AppleScript application).
 function macBrowserUrlScript(app) {
-  const a = String(app || '').toLowerCase();
-  if (a.includes('safari')) return 'tell application "Safari" to return URL of front document';
-  const chromium = {
-    'google chrome': 'Google Chrome', 'chrome': 'Google Chrome', 'brave': 'Brave Browser',
-    'microsoft edge': 'Microsoft Edge', 'edge': 'Microsoft Edge', 'arc': 'Arc',
-    'vivaldi': 'Vivaldi', 'opera': 'Opera', 'chromium': 'Chromium'
-  };
-  for (const key of Object.keys(chromium)) {
-    if (a.includes(key)) return `tell application "${chromium[key]}" to return URL of active tab of front window`;
+  const name = String(app || '').trim().replace(/["\\]/g, '');
+  const a = name.toLowerCase();
+  if (a === 'safari' || a.startsWith('safari technology')) {
+    return `tell application "${name}" to return URL of front document`;
   }
-  return null;
+  const CHROMIUM = ['google chrome', 'chrome', 'microsoft edge', 'brave browser',
+    'arc', 'vivaldi', 'opera', 'chromium'];
+  if (!CHROMIUM.some((k) => a === k || a.startsWith(k + ' '))) return null;
+  return `tell application "${name}" to return URL of active tab of front window`;
 }
 
 // Run a one-shot AppleScript to read the browser URL. Fully defensive: hard
@@ -1062,6 +1103,14 @@ function cleanSourceTitle(raw) {
 // gives the exact website for a capture with zero extra system access.
 function getClipboardSourceUrl() {
   try {
+    // Chromium browsers on macOS put the copied-from page address on the
+    // pasteboard next to every copy (Safari has no equivalent, it falls back
+    // to the front-tab AppleScript). Exact source, no permissions needed.
+    if (process.platform === 'darwin') {
+      const buf = clipboard.readBuffer('org.chromium.source-url');
+      const url = buf && buf.length ? buf.toString('utf8').trim().replace(/[<>"]/g, '') : '';
+      return /^https?:\/\//i.test(url) && url.length <= 400 ? url : null;
+    }
     const raw = clipboard.readBuffer('HTML Format');
     if (!raw || raw.length === 0) return null;
     const head = raw.toString('utf8', 0, Math.min(raw.length, 2048));
@@ -1145,7 +1194,7 @@ async function maybeStampSource(pending) {
   // Read it here, after the toast is on screen: forcing the HTML clipboard
   // format to render can block for a long time on large copies.
   const clipUrl = getClipboardSourceUrl();
-  const info = await sample.infoPromise;
+  const info = await sample.infoPromise.catch(() => null);
   const title = cleanSourceTitle(info && info.title);
   const url = clipUrl || normalizeAddressBarUrl(info && info.url);
   const appName = cleanAppName(info, title, url);
@@ -2111,7 +2160,7 @@ app.whenReady().then(() => {
   // seconds: spawning PowerShell during launch competes with the window's
   // first paint on slower machines, and a capture that beats the timer
   // starts the helper on demand anyway.
-  if (settings.stampSource) {
+  if (settings.stampSource && process.platform === 'win32') {
     setTimeout(() => {
       if (settings.stampSource) {
         startTitleHelper();

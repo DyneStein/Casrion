@@ -75,7 +75,8 @@
       "minimumSystemVersion": "11.0",
       "artifactName": "Casrion-${version}-arm64.${ext}",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Casrion records voice memos into your notes when you use the voice memo shortcut."
+        "NSMicrophoneUsageDescription": "Casrion records voice memos into your notes when you use the voice memo shortcut.",
+        "NSAppleEventsUsageDescription": "Casrion asks your browser for the current page address so captured notes can be stamped with the exact page they came from."
       },
       "files": [
         "!**/node_modules/@node-llama-cpp/win-*/**",
