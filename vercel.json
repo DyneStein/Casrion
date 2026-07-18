@@ -4,6 +4,11 @@
       "source": "/get",
       "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.0/Casrion-Setup-1.0.0.exe",
       "statusCode": 302
+    },
+    {
+      "source": "/get-mac",
+      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.0/Casrion-1.0.0-arm64.dmg",
+      "statusCode": 302
     }
   ]
 }

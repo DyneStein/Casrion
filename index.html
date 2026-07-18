@@ -15,7 +15,7 @@
   <!-- Fixed print furniture -->
   <div class="crops" aria-hidden="true"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i></div>
   <div class="margin-note margin-left" aria-hidden="true">CASRION &middot; FIELD MANUAL &middot; 2026</div>
-  <div class="margin-note margin-right" aria-hidden="true">DOC. 001 &middot; WINDOWS BUILD</div>
+  <div class="margin-note margin-right" aria-hidden="true">DOC. 001 &middot; WINDOWS &amp; MAC</div>
 
   <div class="sheet">
 
@@ -27,7 +27,7 @@
           <img src="./logo-64.png" alt="" width="26" height="26">
           <span class="mast-name">CASRION</span>
         </span>
-        <span class="mast-cell mono right">WINDOWS 10 / 11</span>
+        <span class="mast-cell mono right">WINDOWS &middot; MACOS</span>
       </div>
       <div class="rule-double"></div>
       <div class="mast-sub mono">
@@ -51,8 +51,9 @@
             dated note that remembers where it came from, before you even look away.
           </p>
           <div class="hero-actions reveal d3">
-            <a class="btn-stamp" href="#download">[ GET CASRION FOR WINDOWS ]</a>
-            <span class="hero-meta mono">v1.0.0 &middot; free &middot; about 100 MB &middot; no account</span>
+            <a class="btn-stamp" href="#download">[ WINDOWS ]</a>
+            <a class="btn-stamp" href="#download-mac">[ MAC ]</a>
+            <span class="hero-meta mono">v1.0.0 &middot; free &middot; no account</span>
           </div>
         </div>
 
@@ -79,12 +80,12 @@
           <span class="ed-name">Windows</span>
           <span class="ed-btn mono">AVAILABLE NOW</span>
         </a>
-        <div class="ed-card ed-soon reveal" style="--i:1">
+        <a class="ed-card reveal" style="--i:1" href="#download-mac">
           <span class="ed-art" style="background-image:url('./art/ed-mac.jpg')" aria-hidden="true"></span>
-          <span class="ed-eyebrow mono">MACOS</span>
+          <span class="ed-eyebrow mono">MACOS &middot; APPLE SILICON</span>
           <span class="ed-name">Mac</span>
-          <span class="ed-btn mono ghost">SOON, HOPEFULLY</span>
-        </div>
+          <span class="ed-btn mono">AVAILABLE NOW</span>
+        </a>
         <div class="ed-card ed-soon reveal" style="--i:2">
           <span class="ed-art ed-art-right" style="background-image:url('./art/ed-linux.jpg')" aria-hidden="true"></span>
           <span class="ed-eyebrow mono">LINUX</span>
@@ -317,7 +318,7 @@
         <table class="spec reveal">
           <tbody>
             <tr><th class="mono">VERSION</th><td>1.0.0</td></tr>
-            <tr><th class="mono">PLATFORM</th><td>Windows 10 and 11</td></tr>
+            <tr><th class="mono">PLATFORM</th><td>Windows 10 / 11 &middot; macOS 11+ (Apple Silicon)</td></tr>
             <tr><th class="mono">SIZE</th><td>About 100 MB installed</td></tr>
             <tr><th class="mono">FORMAT</th><td>Plain Markdown files</td></tr>
             <tr><th class="mono">STORAGE</th><td>Folders you choose, on your disk</td></tr>
@@ -366,6 +367,75 @@
 
     <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
 
+    <!-- ================= GET CASRION (MAC) ================= -->
+    <section class="section" id="download-mac">
+      <div class="coupon reveal">
+        <div class="coupon-head mono">
+          <span>CASRION</span><span>VERSION 1.0.0</span><span>MACOS &middot; APPLE SILICON</span><span>FREE</span>
+        </div>
+        <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
+        <h2>On a Mac? Grab it here.</h2>
+        <p class="coupon-lead">Built for Apple Silicon (M1 and newer). Same Casrion, with <b>Cmd</b> where Windows uses Ctrl.</p>
+
+        <!-- /get-mac 302-redirects to the .dmg, so the version lives in one place. -->
+        <p class="dl-wrap">
+          <a class="btn-stamp big" href="/get-mac">[ DOWNLOAD FOR MAC ]</a>
+        </p>
+
+        <p class="coupon-note mono">The app is unsigned, so macOS needs a couple of one-time permissions before everything works. It takes two minutes. Here is the whole thing:</p>
+
+        <ol class="mac-setup">
+          <li class="setup-step">
+            <span class="setup-num mono">01</span>
+            <div class="setup-body">
+              <h3>Install it</h3>
+              <p>Open the downloaded <span class="mono">.dmg</span>, then drag the Casrion icon into your <b>Applications</b> folder.</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">02</span>
+            <div class="setup-body">
+              <h3>Open it the first time</h3>
+              <p>Because it is not from the App Store, macOS blocks the first launch. Open <b>Applications</b>, <b>right-click</b> Casrion and choose <b>Open</b>, then <b>Open</b> again in the dialog. If macOS still refuses (&ldquo;can&rsquo;t be opened&rdquo;), open <b>Terminal</b> and paste this once, then open the app normally:</p>
+              <p class="setup-code mono">xattr -cr /Applications/Casrion.app</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">03</span>
+            <div class="setup-body">
+              <h3>Allow Accessibility &mdash; for Explain</h3>
+              <p>The Explain feature reads the text you highlight. Go to <b>System Settings &rarr; Privacy &amp; Security &rarr; Accessibility</b> and turn <b>Casrion</b> on. This powers <span class="mono">Cmd+Shift+E</span> and the double-tap gesture. (Casrion opens this pane for you the first time you try to explain something.)</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">04</span>
+            <div class="setup-body">
+              <h3>Allow Input Monitoring &mdash; for double-tap Cmd</h3>
+              <p>Want to trigger Explain by tapping <b>Cmd twice</b>? macOS guards raw key taps separately, so also turn <b>Casrion</b> on under <b>System Settings &rarr; Privacy &amp; Security &rarr; Input Monitoring</b>. Prefer not to? Skip this one and just use <span class="mono">Cmd+Shift+E</span>, which needs only step 03.</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">05</span>
+            <div class="setup-body">
+              <h3>Allow the Microphone &mdash; for voice memos</h3>
+              <p>The first time you record a voice memo, macOS asks for microphone access. Click <b>Allow</b>. That is it.</p>
+            </div>
+          </li>
+          <li class="setup-step">
+            <span class="setup-num mono">06</span>
+            <div class="setup-body">
+              <h3>Quit and reopen once</h3>
+              <p>After turning on any permission above, fully quit Casrion from the menu-bar icon and open it again so macOS applies the change. You only do this at setup.</p>
+            </div>
+          </li>
+        </ol>
+
+        <p class="coupon-star mono">tip: the Casrion menu-bar icon has an &ldquo;Explain permissions&rdquo; shortcut that jumps you straight to the right settings panes.</p>
+      </div>
+    </section>
+
+    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+
     <!-- ================= APPENDIX A ================= -->
     <section class="section" id="appendix">
       <header class="sec-head reveal">
@@ -397,6 +467,18 @@
       <details class="qa reveal" style="--i:5">
         <summary><span class="qa-num mono">A.6</span>Download did not start, or I want the latest?</summary>
         <p>Just hit the button again, the link always grabs the current version. If your browser is being weird, right-click it and choose <b>Save link as</b>. Still stuck? Ping me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.</p>
+      </details>
+      <details class="qa reveal" style="--i:6">
+        <summary><span class="qa-num mono">A.7</span>On my Mac it says Casrion &ldquo;can&rsquo;t be opened&rdquo;. Now what?</summary>
+        <p>That is macOS being cautious about an app that is not from the App Store, not a problem with Casrion. After dragging it to Applications, <b>right-click</b> the app and choose <b>Open</b>, then <b>Open</b> again. If it still refuses, open <b>Terminal</b> and run <span class="mono">xattr -cr /Applications/Casrion.app</span> once, then open it normally. Full walkthrough is in the <a href="#download-mac">Mac setup steps</a> above.</p>
+      </details>
+      <details class="qa reveal" style="--i:7">
+        <summary><span class="qa-num mono">A.8</span>Which Macs does it run on?</summary>
+        <p>Apple Silicon Macs (M1 and newer), on macOS 11 or later. Older Intel Macs are not supported yet.</p>
+      </details>
+      <details class="qa reveal" style="--i:8">
+        <summary><span class="qa-num mono">A.9</span>On Mac, Explain says it needs permission, or the double-tap Cmd does nothing.</summary>
+        <p>Explain uses two separate macOS permissions. <b>Accessibility</b> lets it read your highlighted text (needed for <span class="mono">Cmd+Shift+E</span> and the double-tap). <b>Input Monitoring</b> lets it notice the double-tap of the Cmd key. Turn Casrion on under <b>System Settings &rarr; Privacy &amp; Security</b> for each, then quit and reopen Casrion. If you only grant Accessibility, <span class="mono">Cmd+Shift+E</span> still works fine. The Casrion menu-bar icon has an &ldquo;Explain permissions&rdquo; shortcut to the exact panes.</p>
       </details>
     </section>
 

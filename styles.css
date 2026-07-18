@@ -649,6 +649,43 @@ html.no-anim .band { height: 640px; }
 }
 .coupon-star a:hover { border-bottom-color: var(--stamp); }
 
+/* ── Mac first-run setup steps ───────────────────── */
+.mac-setup {
+  list-style: none; counter-reset: none;
+  max-width: 52ch; margin: 30px auto 8px; padding: 0;
+  text-align: left;
+  border-top: 1px solid var(--rule);
+}
+.setup-step {
+  display: flex; gap: 16px;
+  padding: 20px 2px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.setup-num {
+  flex: 0 0 auto;
+  font-size: 12px; letter-spacing: 0.14em;
+  color: var(--stamp); font-weight: 700;
+  padding-top: 3px; min-width: 22px;
+}
+.setup-body { min-width: 0; }
+.setup-body h3 {
+  font-family: var(--serif); font-weight: 600;
+  font-size: 1.06rem; margin: 0 0 6px;
+}
+.setup-body p {
+  font-size: 0.95rem; line-height: 1.65; color: var(--ink-soft);
+  margin: 0;
+}
+.setup-body p + p { margin-top: 8px; }
+.setup-code {
+  font-size: 12px; color: var(--ink);
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  padding: 8px 12px; border-radius: 3px;
+  overflow-x: auto; white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
 /* ── Appendix ────────────────────────────────────── */
 .qa {
   border-top: 1px solid var(--rule-soft);
