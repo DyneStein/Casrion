@@ -119,6 +119,18 @@ function HelpPanel({ onClose }) {
               in the popup, copy the answer, or save it straight into your note.
               {' '}{MOD}+Shift+E does the same thing if you prefer a regular shortcut.
             </p>
+            {IS_MAC && (
+              <p>
+                On a Mac this feature needs two one-time permissions in System
+                Settings &gt; Privacy &amp; Security. <strong>Accessibility</strong> lets
+                Casrion read the text you selected (used by both Cmd+Shift+E and the
+                double-tap). <strong>Input Monitoring</strong> lets Casrion see the
+                double-tap of the Cmd key, so grant that one too if you want the
+                double-tap gesture. You can open both panes from the Casrion menu-bar
+                icon under &ldquo;Explain permissions&rdquo;. After turning a permission on,
+                quit and reopen Casrion once.
+              </p>
+            )}
           </section>
 
           <section>

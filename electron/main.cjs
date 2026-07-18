@@ -800,10 +800,29 @@ function refreshTrayMenu() {
       checked: settings.explainEnabled !== false,
       click: (item) => explainFeature.setEnabled(item.checked)
     },
+    // macOS gates the explain feature behind two separate privacy permissions;
+    // give the user one-click access to both panes since they are easy to miss.
+    ...(process.platform === 'darwin' ? [
+      {
+        label: 'Explain permissions (macOS)',
+        submenu: [
+          { label: 'Open Accessibility settings (read selection)', click: () => openMacPrivacyPane('Privacy_Accessibility') },
+          { label: 'Open Input Monitoring settings (double-tap Cmd)', click: () => openMacPrivacyPane('Privacy_ListenEvent') }
+        ]
+      }
+    ] : []),
     { type: 'separator' },
     { label: 'Quit Casrion', click: () => quitApp() }
   ]);
   tray.setContextMenu(contextMenu);
+}
+
+// Deep-link straight to a macOS Privacy & Security pane (Accessibility,
+// Input Monitoring, ...). The anchor names are Apple's internal pane ids.
+function openMacPrivacyPane(anchor) {
+  if (process.platform !== 'darwin') return;
+  shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${anchor}`)
+    .catch(() => {});
 }
 
 function createTray() {
@@ -950,16 +969,24 @@ function stopTitleHelper() {
 // browser build its accessibility tree, which can take most of a second, so
 // the timeout is generous. Repeat lookups hit the helper's element cache and
 // come back in a few milliseconds.
-function getForegroundSourceInfo(timeoutMs = 1200, force = false) {
+function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true) {
   // Explain lookups need the helper even when source stamping is off
   if (!settings.stampSource && !force) return Promise.resolve(null);
   // macOS has no PowerShell/UI-Automation helper. Reuse the explain selection
-  // hook (which already holds Accessibility permission) to name the app the
-  // capture came from. No window title or browser URL yet, just the app name.
+  // hook (already holds Accessibility) to name the app the capture came from,
+  // and for a front browser ask it for the page URL via AppleScript. The URL
+  // step is skipped for explain (wantUrl=false): it spawns osascript and would
+  // trigger a per-browser Automation prompt the explain flow does not need.
   if (process.platform === 'darwin') {
     let app = '';
     try { app = explainFeature.getForegroundAppName(); } catch { app = ''; }
-    return Promise.resolve(app ? { title: '', proc: app.toLowerCase(), app, url: '' } : null);
+    if (!app) return Promise.resolve(null);
+    const base = { title: '', proc: app.toLowerCase(), app, url: '' };
+    const script = wantUrl ? macBrowserUrlScript(app) : null;
+    if (!script) return Promise.resolve(base);
+    // A normal read is ~100-200ms; the cap keeps the stamp from waiting on a
+    // first-time Automation prompt (that capture just goes out without a URL).
+    return getMacBrowserUrl(script, 900).then((url) => ({ ...base, url: url || '' }));
   }
   startTitleHelper();
   if (!titleHelper) return Promise.resolve(null);
@@ -975,6 +1002,45 @@ function getForegroundSourceInfo(timeoutMs = 1200, force = false) {
       titleHelperPending.delete(id);
       resolve(null);
     }
+  });
+}
+
+// AppleScript that returns the front tab's URL for a known browser, or null
+// for anything else. Safari and the Chromium family expose it differently.
+function macBrowserUrlScript(app) {
+  const a = String(app || '').toLowerCase();
+  if (a.includes('safari')) return 'tell application "Safari" to return URL of front document';
+  const chromium = {
+    'google chrome': 'Google Chrome', 'chrome': 'Google Chrome', 'brave': 'Brave Browser',
+    'microsoft edge': 'Microsoft Edge', 'edge': 'Microsoft Edge', 'arc': 'Arc',
+    'vivaldi': 'Vivaldi', 'opera': 'Opera', 'chromium': 'Chromium'
+  };
+  for (const key of Object.keys(chromium)) {
+    if (a.includes(key)) return `tell application "${chromium[key]}" to return URL of active tab of front window`;
+  }
+  return null;
+}
+
+// Run a one-shot AppleScript to read the browser URL. Fully defensive: hard
+// timeout, killed on overrun, only a real http(s) URL is accepted, and any
+// failure (browser closed, Automation permission denied) resolves to ''.
+function getMacBrowserUrl(script, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    let child;
+    try {
+      child = spawn('osascript', ['-e', script], { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch { return finish(''); }
+    let out = '';
+    const timer = setTimeout(() => { try { child.kill(); } catch { /* gone */ } finish(''); }, timeoutMs);
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.on('error', () => { clearTimeout(timer); finish(''); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const u = out.trim();
+      finish(/^https?:\/\//i.test(u) ? u : '');
+    });
   });
 }
 
@@ -2048,7 +2114,9 @@ app.whenReady().then(() => {
   registerIPC();
 
   explainFeature.init({
-    getForegroundSourceInfo: (timeoutMs) => getForegroundSourceInfo(timeoutMs, true),
+    // wantUrl:false — explain never needs the browser URL, and on macOS the
+    // URL lookup would spawn osascript and trigger a browser Automation prompt
+    getForegroundSourceInfo: (timeoutMs) => getForegroundSourceInfo(timeoutMs, true, false),
     cleanSourceTitle,
     showOverlayNotification,
     enqueueCapture,
