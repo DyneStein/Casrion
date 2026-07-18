@@ -12,6 +12,14 @@ const IS_MAC = process.platform === 'darwin';
 // The gesture key: Ctrl on Windows, Cmd on Mac (uniKey follows MDN key values)
 const TAP_KEY = IS_MAC ? 'Meta' : 'Control';
 const INVALID_COORD = -99999;
+
+// Clipboard fallback stays on for Windows (some apps expose no UI Automation),
+// but is OFF on macOS: without real Accessibility access it silently returns
+// whatever is already on the clipboard, so every explain reads the same stale
+// text and the popup looks like it is "explaining the same thing every time".
+// With it off, a failed read is honestly empty and we can guide the user to
+// grant permission instead of masking the problem.
+const HOOK_START_OPTS = { enableClipboard: !IS_MAC };
 const WIN_W = 470;
 const WIN_H = 190;
 
@@ -98,7 +106,7 @@ function refreshMacTrust(promptIfNeeded) {
   let nowTrusted = false;
   try { nowTrusted = hook.macIsProcessTrusted(); } catch { nowTrusted = false; }
   if (nowTrusted && !macTrusted) {
-    try { hook.stop(); hook.start({ enableClipboard: true }); } catch { /* a restart will re-arm */ }
+    try { hook.stop(); hook.start(HOOK_START_OPTS); } catch { /* a restart will re-arm */ }
   }
   macTrusted = nowTrusted;
   // Only surface the system prompt on a real user trigger, never at startup:
@@ -116,7 +124,7 @@ function macNeedsAccessibility() {
 function initSelectionHook(promptForTrust) {
   if (!isEnabled() || (process.platform !== 'win32' && !IS_MAC)) return;
   if (hook) {
-    try { if (!hook.isRunning()) hook.start({ enableClipboard: true }); } catch { /* keep old state */ }
+    try { if (!hook.isRunning()) hook.start(HOOK_START_OPTS); } catch { /* keep old state */ }
     refreshMacTrust(promptForTrust);
     return;
   }
@@ -171,7 +179,7 @@ function initSelectionHook(promptForTrust) {
     });
     hook.on('error', (err) => console.error('[Casrion] selection-hook:', err && err.message));
     hook.on('status', (s) => console.log('[Casrion] selection-hook status:', s));
-    const ok = hook.start({ enableClipboard: true });
+    const ok = hook.start(HOOK_START_OPTS);
     if (!ok) {
       console.error('[Casrion] selection-hook failed to start');
       hookFailed = true;
