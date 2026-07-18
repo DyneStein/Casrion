@@ -953,6 +953,14 @@ function stopTitleHelper() {
 function getForegroundSourceInfo(timeoutMs = 1200, force = false) {
   // Explain lookups need the helper even when source stamping is off
   if (!settings.stampSource && !force) return Promise.resolve(null);
+  // macOS has no PowerShell/UI-Automation helper. Reuse the explain selection
+  // hook (which already holds Accessibility permission) to name the app the
+  // capture came from. No window title or browser URL yet, just the app name.
+  if (process.platform === 'darwin') {
+    let app = '';
+    try { app = explainFeature.getForegroundAppName(); } catch { app = ''; }
+    return Promise.resolve(app ? { title: '', proc: app.toLowerCase(), app, url: '' } : null);
+  }
   startTitleHelper();
   if (!titleHelper) return Promise.resolve(null);
   return new Promise((resolve) => {

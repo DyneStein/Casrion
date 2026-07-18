@@ -329,6 +329,9 @@
       panel.dataset.state = s.state;
       if (s.state === 'no-selection') {
         setPending('Nothing selected. Highlight some text anywhere, then double-tap ' + TAP_NAME + '.');
+      } else if (s.state === 'need-permission') {
+        setPending('Casrion needs Accessibility permission to read your selection. Open System Settings > Privacy & Security > Accessibility, turn Casrion on, then quit and reopen Casrion.');
+        requestResize();
       } else if (s.state === 'need-model') {
         setPending('One-time setup: Casrion downloads a small offline brain so it can explain things without the internet.');
         dlBtn.textContent = 'Download ' + (s.modelLabel || 'model');

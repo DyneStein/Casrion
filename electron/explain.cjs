@@ -85,22 +85,39 @@ function setEnabled(enabled) {
 
 // ── selection-hook ──────────────────────────────────────────
 
-let axPrompted = false;
+let axPrompted = false;   // macOS: prompted for Accessibility once this run
+let macTrusted = false;   // macOS: Accessibility granted (selection + keys work)
 
-function initSelectionHook() {
-  if (!isEnabled() || (process.platform !== 'win32' && !IS_MAC)) return;
-  // On Mac the hook reads selections through the accessibility API, which
-  // needs a one-time user grant; the system prompt is shown once per run
-  // and later calls just re-check quietly until the user has granted it
-  if (IS_MAC) {
-    try {
-      const trusted = systemPreferences.isTrustedAccessibilityClient(!axPrompted);
-      axPrompted = true;
-      if (!trusted) return;
-    } catch { /* keep going, hook.start reports its own failure */ }
+// On macOS the hook starts fine without Accessibility permission, but it reads
+// no selection and fires no key/mouse events until the user grants it. The
+// per-call AXAPI selection read starts working the instant permission is
+// granted; the global key/mouse taps only re-arm when the hook is restarted,
+// so re-establish them here the moment we notice the grant landed.
+function refreshMacTrust(promptIfNeeded) {
+  if (!IS_MAC || !hook) return;
+  let nowTrusted = false;
+  try { nowTrusted = hook.macIsProcessTrusted(); } catch { nowTrusted = false; }
+  if (nowTrusted && !macTrusted) {
+    try { hook.stop(); hook.start({ enableClipboard: true }); } catch { /* a restart will re-arm */ }
   }
+  macTrusted = nowTrusted;
+  // Only surface the system prompt on a real user trigger, never at startup:
+  // it opens System Settings, which is jarring the moment the app launches.
+  if (!macTrusted && promptIfNeeded && !axPrompted) {
+    axPrompted = true;
+    try { systemPreferences.isTrustedAccessibilityClient(true); } catch { /* hook still starts */ }
+  }
+}
+
+function macNeedsAccessibility() {
+  return IS_MAC && !macTrusted;
+}
+
+function initSelectionHook(promptForTrust) {
+  if (!isEnabled() || (process.platform !== 'win32' && !IS_MAC)) return;
   if (hook) {
     try { if (!hook.isRunning()) hook.start({ enableClipboard: true }); } catch { /* keep old state */ }
+    refreshMacTrust(promptForTrust);
     return;
   }
   if (hookFailed) return;
@@ -159,7 +176,11 @@ function initSelectionHook() {
       console.error('[Casrion] selection-hook failed to start');
       hookFailed = true;
       hook = null;
+      return;
     }
+    // Start succeeds even on macOS without permission; check trust (prompting
+    // only when this init came from a real user trigger, not startup warm-up).
+    refreshMacTrust(promptForTrust);
   } catch (e) {
     console.error('[Casrion] selection-hook unavailable:', e.message);
     hookFailed = true;
@@ -184,6 +205,10 @@ function getSelectionNow() {
 // ── window ──────────────────────────────────────────────────
 
 function toDip(point) {
+  // selection-hook returns physical pixels on Windows (convert to DIP) but
+  // already-logical points on macOS (converting again would halve them on a
+  // Retina screen and throw the popup into the top-left corner).
+  if (IS_MAC) return point;
   try { return screen.screenToDipPoint(point); } catch { return point; }
 }
 
@@ -289,7 +314,7 @@ function hideExplain() {
 
 function triggerExplain() {
   if (!deps || !isEnabled()) return;
-  initSelectionHook();
+  initSelectionHook(true); // a real trigger may prompt for macOS Accessibility
   const sel = getSelectionNow();
 
   // Same selection (or none) while open means "close it"
@@ -329,7 +354,11 @@ function beginRun(sel) {
 
   if (!selText) {
     showNow();
-    send('explain-status', { state: 'no-selection' });
+    // On macOS an empty read usually means Accessibility was never granted,
+    // not that nothing is selected; guide the user instead of misleading them.
+    send('explain-status', macNeedsAccessibility()
+      ? { state: 'need-permission' }
+      : { state: 'no-selection' });
     return;
   }
   if (!llm.hasModelFile()) {
@@ -525,6 +554,28 @@ function shutdown() {
   explainWindow = null;
 }
 
+// The name of the app that owns the current (or a very recent) selection.
+// Source stamping on macOS reuses this: the selection hook already holds the
+// Accessibility permission, so no separate automation prompt is needed. macOS
+// may report a bundle id or path, so it is trimmed to a friendly name.
+function getForegroundAppName() {
+  if (!hook) return '';
+  let raw = '';
+  try {
+    const s = hook.getCurrentSelection();
+    if (s && s.programName) raw = s.programName;
+  } catch { /* ignore */ }
+  if (!raw && lastEventSelection && Date.now() - lastEventSelection.ts < 20000) {
+    raw = lastEventSelection.data.programName || '';
+  }
+  let n = String(raw || '').trim();
+  if (!n) return '';
+  if (n.includes('/')) n = n.split('/').pop();      // a path -> basename
+  n = n.replace(/\.app$/i, '');                      // "Safari.app" -> "Safari"
+  if (/^[a-z]{2,}(\.[a-z0-9-]+){2,}$/i.test(n)) n = n.split('.').pop(); // com.apple.Safari -> Safari
+  return n;
+}
+
 // Diagnostics for troubleshooting selection capture on a given machine
 function debugState() {
   let current = null;
@@ -532,6 +583,7 @@ function debugState() {
   return {
     hookRunning: !!(hook && hook.isRunning()),
     hookFailed,
+    macTrusted: IS_MAC ? macTrusted : undefined,
     lastEvent: lastEventSelection
       ? { text: lastEventSelection.data.text.slice(0, 80), ageMs: Date.now() - lastEventSelection.ts, program: lastEventSelection.data.programName }
       : null,
@@ -541,4 +593,4 @@ function debugState() {
   };
 }
 
-module.exports = { init, warmUp, triggerExplain, setEnabled, isEnabled, shutdown, debugState };
+module.exports = { init, warmUp, triggerExplain, setEnabled, isEnabled, shutdown, debugState, getForegroundAppName };
