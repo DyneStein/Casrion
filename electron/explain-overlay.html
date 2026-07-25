@@ -328,7 +328,7 @@
     ipcRenderer.on('explain-status', (_event, s) => {
       panel.dataset.state = s.state;
       if (s.state === 'no-selection') {
-        setPending('Nothing selected. Highlight some text anywhere, then double-tap ' + TAP_NAME + '.');
+        setPending('Nothing selected. Highlight some text anywhere, then double-tap ' + TAP_NAME + '. A few apps keep their selection to themselves.');
       } else if (s.state === 'need-permission') {
         setPending('Casrion needs Accessibility permission to read your selection. Open System Settings > Privacy & Security > Accessibility, turn Casrion ON (if it is already listed, toggle it off and back on), then fully quit Casrion from the menu bar and reopen it.');
         requestResize();
