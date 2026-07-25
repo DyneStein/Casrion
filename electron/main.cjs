@@ -13,6 +13,7 @@ const fs = require('fs');
 const { Readable } = require('stream');
 const { spawn } = require('child_process');
 const { normalizeCapture, stripColorMarkup } = require('./capture-normalize.cjs');
+const { patchWebmDuration } = require('./webm-duration.cjs');
 const explainFeature = require('./explain.cjs');
 
 // Build integrity tag — do not remove.
@@ -35,6 +36,12 @@ let settings = {};
 let undoStack = []; // stores { filePath, content, insertionLine } snapshots
 let redoStack = []; // undone snapshots, cleared by any fresh change
 let isRecording = false;
+// The recorder itself lives in the renderer, so "recording" is only real once
+// that side says so. Until then the sticky "Recording..." toast is a promise
+// we have not kept, and a microphone that never opens must not leave it up.
+let recordingConfirmed = false;
+let recordingStartTimer = null;
+const RECORDING_START_TIMEOUT = 8000;
 const MAX_UNDO = 50;
 
 const settingsPath = path.join(app.getPath('userData'), 'casrion-settings.json');
@@ -539,6 +546,8 @@ function createWindow() {
     if (details.reason !== 'clean-exit') {
       console.error('[Casrion] Renderer gone (' + details.reason + '), reloading');
       isRecording = false;
+      recordingConfirmed = false;
+      clearTimeout(recordingStartTimer);
       mainWindow.webContents.reload();
     }
   });
@@ -1222,6 +1231,67 @@ const WRAPPER_MODES = {
   blue: (t) => `<span style="color: #3b82f6">${t}</span>`
 };
 
+// ─── Reading the clipboard without believing a failed read ────
+//
+// Windows hands the clipboard to one process at a time. While another app has
+// it open (a clipboard manager, Office, a screenshot tool still writing its
+// bitmap) every read fails, and Electron reports that failure as "there is
+// nothing on the clipboard at all" — indistinguishable from an empty one.
+// That is how a perfectly good screenshot turns into "No image in clipboard".
+// An empty format list is therefore treated as "ask again in a moment"; a
+// non-empty one is trusted immediately, so the common path costs nothing.
+const CLIP_RETRIES = 5;
+const CLIP_RETRY_MS = 30;
+
+// Deliberately blocking: these run inside the hotkey handler, where the whole
+// point is to read the clipboard as it was when the key went down. The wait
+// only ever happens on a failed read (max ~150ms), never on the happy path.
+// Atomics.wait parks the thread instead of burning a core on a spin loop.
+const waitCell = new Int32Array(new SharedArrayBuffer(4));
+function waitSync(ms) {
+  try {
+    Atomics.wait(waitCell, 0, 0, ms);
+  } catch {
+    const end = Date.now() + ms;
+    while (Date.now() < end) { /* no Atomics here: hold the line the dumb way */ }
+  }
+}
+
+// The clipboard's formats, retried while the list comes back empty.
+function clipboardFormats() {
+  for (let i = 0; ; i++) {
+    const formats = clipboard.availableFormats();
+    if (formats.length || i >= CLIP_RETRIES) return formats;
+    waitSync(CLIP_RETRY_MS);
+  }
+}
+
+function clipboardHasImage() {
+  return clipboardFormats().some((f) => f.startsWith('image/'));
+}
+
+// Formats and text together, retried while the pair looks like a failed read:
+// no formats at all, or formats that promise text which reads back empty.
+function clipboardTextSnapshot() {
+  for (let i = 0; ; i++) {
+    const formats = clipboard.availableFormats();
+    const text = clipboard.readText();
+    const claimsText = formats.some((f) => f.startsWith('text/'));
+    if ((formats.length && (text || !claimsText)) || i >= CLIP_RETRIES) return { formats, text };
+    waitSync(CLIP_RETRY_MS);
+  }
+}
+
+// The bitmap itself. A read can still come back empty right after the formats
+// said otherwise (the owning app releases it mid-read), so retry that too.
+function readClipboardImage() {
+  for (let i = 0; ; i++) {
+    const image = clipboard.readImage();
+    if (!image.isEmpty() || i >= CLIP_RETRIES) return image;
+    waitSync(CLIP_RETRY_MS);
+  }
+}
+
 // Guards, clipboard sniff and the confirmation toast. Runs synchronously in
 // the hotkey handler itself, so the toast appears the instant the key goes
 // down even when the capture chain is still busy committing earlier work.
@@ -1233,9 +1303,8 @@ function preflightText(mode) {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  const formats = clipboard.availableFormats();
+  const { formats, text: rawText } = clipboardTextSnapshot();
   const hasHtml = formats.includes('text/html');
-  const rawText = clipboard.readText();
 
   if (WRAPPER_MODES[mode]) {
     // Drop any color the snippet already carries so Alt+R/G/B always applies
@@ -1300,26 +1369,36 @@ async function captureText(mode = 'append', pendingStamp = null, pre = null) {
   notifyRendererFileUpdated();
 }
 
-// Sniff + toast for image captures, run in the hotkey handler. Decoding the
-// actual bitmap of a 4K screenshot takes real time; only the cheap format
-// list is consulted before the toast.
+// Sniff + toast for image captures, run in the hotkey handler. The cheap
+// format list decides the toast (decoding the bitmap of a 4K screenshot takes
+// real time), but the bitmap is then grabbed in the same breath, before the
+// handler returns: by the time the capture queue drains, the user may have
+// copied something else, and any app on the machine can wipe the clipboard in
+// between. What lands in the note is what was on the clipboard at key-down.
 function preflightImage() {
   if (!activeFilePath) {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  if (!clipboard.availableFormats().some((f) => f.startsWith('image/'))) {
+  if (!clipboardHasImage()) {
     showOverlayNotification(`No image in clipboard. ${SCREENSHOT_HINT}`, 'error');
     return null;
   }
   showOverlayNotification('Image Saved', 'image');
-  return {};
+  const image = readClipboardImage();
+  if (image.isEmpty()) {
+    // The formats promised a bitmap a moment ago, so this is a lost race, not
+    // an empty clipboard. Replace the toast we just showed.
+    showOverlayNotification('Could not read that image. Copy it again', 'error');
+    return null;
+  }
+  return { image };
 }
 
 async function captureImage(pendingStamp = null, pre = null) {
   const p = pre || preflightImage();
   if (!p) return;
-  const image = clipboard.readImage();
+  const image = p.image || readClipboardImage();
   if (!image.isEmpty()) {
     pushUndo();
     await maybeStampSource(pendingStamp);
@@ -1384,7 +1463,7 @@ function preflightCode() {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  const text = clipboard.readText();
+  const { text } = clipboardTextSnapshot();
   if (!text || text.trim().length === 0) {
     showOverlayNotification(`Clipboard is empty. Copy code first (${MOD_LABEL}+C)`, 'error');
     return null;
@@ -1469,10 +1548,23 @@ async function toggleRecording() {
     // The recorder lives in the (possibly hidden and throttled) main window
     // renderer — wake it to full speed for the duration of the recording.
     mainWindow.webContents.setBackgroundThrottling(false);
+    recordingConfirmed = false;
     mainWindow.webContents.send('start-recording');
     showOverlayNotification(`Recording... (Press ${MOD_LABEL}+Shift+M to stop)`, 'mic', 0);
+    // If the renderer never gets a microphone open (none plugged in, Windows
+    // privacy settings blocking desktop apps, another app holding it, a wedged
+    // renderer), nothing would ever clear that sticky toast and the next press
+    // would just look like it did nothing. Give the start a deadline.
+    clearTimeout(recordingStartTimer);
+    recordingStartTimer = setTimeout(() => {
+      if (!isRecording || recordingConfirmed) return;
+      isRecording = false;
+      showOverlayNotification('Could not start recording. Check that a microphone is connected and allowed', 'error', 6000);
+      rethrottleAfterRecording();
+    }, RECORDING_START_TIMEOUT);
   } else {
     console.log('[Casrion] Stopping voice recording...');
+    clearTimeout(recordingStartTimer);
     mainWindow.webContents.send('stop-recording');
   }
 }
@@ -1498,6 +1590,7 @@ function resolveRecordingFlush() {
 
 function quitApp() {
   app.isQuiting = true;
+  clearTimeout(recordingStartTimer);
   if (isRecording && mainWindow && !mainWindow.isDestroyed()) {
     isRecording = false;
     const flushed = new Promise((resolve) => {
@@ -1628,8 +1721,16 @@ function hydrateContentForRenderer(content, filePath) {
 function registerIPC() {
   ipcMain.handle('get-initial-state', () => buildStatePayload());
 
-  ipcMain.handle('save-audio', (event, buffer, mimeType) => {
+  // The renderer has a live recorder: the "Recording..." toast is now honest.
+  ipcMain.handle('recording-started', () => {
+    recordingConfirmed = true;
+    clearTimeout(recordingStartTimer);
+  });
+
+  ipcMain.handle('save-audio', (event, buffer, mimeType, durationMs) => {
     isRecording = false;
+    recordingConfirmed = false;
+    clearTimeout(recordingStartTimer);
     try {
       if (!activeFilePath) return;
 
@@ -1646,8 +1747,13 @@ function registerIPC() {
       const filename = `audio_${Date.now()}.${ext}`;
       const audioPath = path.join(assetsDir, filename);
 
-      fs.writeFileSync(audioPath, Buffer.from(buffer));
-      console.log(`[Casrion] Saved audio to ${audioPath}`);
+      // A live-muxed WebM carries no length, which used to leave the player
+      // guessing (badly). The recorder timed itself, so write that in.
+      let bytes = Buffer.from(buffer);
+      if (ext === 'webm') bytes = patchWebmDuration(bytes, durationMs);
+
+      fs.writeFileSync(audioPath, bytes);
+      console.log(`[Casrion] Saved audio to ${audioPath} (${Math.round(durationMs || 0)}ms)`);
 
       pushUndo();
       // A voice memo is the user's own recording, never the front window's work
@@ -1673,6 +1779,8 @@ function registerIPC() {
   // main process state and the persistent "Recording..." toast get cleared.
   ipcMain.handle('recording-failed', (_event, message) => {
     isRecording = false;
+    recordingConfirmed = false;
+    clearTimeout(recordingStartTimer);
     showOverlayNotification(message || 'Recording failed. Check the microphone', 'error');
     rethrottleAfterRecording();
     resolveRecordingFlush();

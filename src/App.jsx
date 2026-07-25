@@ -27,6 +27,8 @@ function App() {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  // Set when a stop arrives before the microphone finished opening
+  const stopRequestedRef = useRef(false);
   const saveTimerRef = useRef(null);
   const pendingSaveRef = useRef(null);
 
@@ -99,7 +101,14 @@ function App() {
           }
         };
 
+        // A live-muxed recording carries no length of its own, so time it here
+        // and hand that to the main process, which writes it into the file.
+        // Without it the player has to guess the duration by seeking past the
+        // end, which is what used to leave voice memos looking broken.
+        let startedAt = 0;
+
         mediaRecorder.onstop = async () => {
+          const durationMs = startedAt ? Date.now() - startedAt : 0;
           const chunks = audioChunksRef.current;
           // Stop all tracks to release microphone
           stream.getTracks().forEach((track) => track.stop());
@@ -113,21 +122,38 @@ function App() {
           const recordedType = mediaRecorder.mimeType || 'audio/webm';
           const audioBlob = new Blob(chunks, { type: recordedType });
           const arrayBuffer = await audioBlob.arrayBuffer();
-          window.electronAPI.saveAudio(arrayBuffer, recordedType);
+          window.electronAPI.saveAudio(arrayBuffer, recordedType, durationMs);
         };
 
         // Emit data every 500ms instead of one blob at the end — a renderer
         // hiccup mid-recording then loses at most half a second, not everything.
         mediaRecorder.start(500);
+        startedAt = Date.now();
+        // Tell the main process the microphone is genuinely open, so its
+        // "Recording..." toast is not left standing on a promise.
+        window.electronAPI.recordingStarted();
+
+        // Opening the microphone can take a moment (a cold device, a
+        // permission prompt). If the user hit the shortcut again in that gap,
+        // honor it now instead of recording on regardless.
+        if (stopRequestedRef.current) {
+          stopRequestedRef.current = false;
+          mediaRecorder.stop();
+        }
       } catch (err) {
         console.error('[Casrion] Failed to start recording:', err);
+        stopRequestedRef.current = false;
         window.electronAPI.recordingFailed('Microphone blocked or unavailable');
       }
     });
 
     const unsubStopRecording = window.electronAPI.onStopRecording(() => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        stopRequestedRef.current = false;
         mediaRecorderRef.current.stop();
+      } else {
+        // No recorder yet: the start is still in flight, so leave a note for it
+        stopRequestedRef.current = true;
       }
     });
 

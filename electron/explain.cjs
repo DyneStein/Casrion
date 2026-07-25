@@ -13,13 +13,18 @@ const IS_MAC = process.platform === 'darwin';
 const TAP_KEY = IS_MAC ? 'Meta' : 'Control';
 const INVALID_COORD = -99999;
 
-// Clipboard fallback stays on for Windows (some apps expose no UI Automation),
-// but is OFF on macOS: without real Accessibility access it silently returns
-// whatever is already on the clipboard, so every explain reads the same stale
-// text and the popup looks like it is "explaining the same thing every time".
-// With it off, a failed read is honestly empty and we can guide the user to
-// grant permission instead of masking the problem.
-const HOOK_START_OPTS = { enableClipboard: !IS_MAC };
+// The selection hook's clipboard fallback is OFF everywhere, and must stay off.
+// When a native accessibility read finds nothing, that fallback empties the
+// user's real clipboard, fires a simulated Ctrl+C at the foreground app, waits
+// up to ~280ms, then puts back a copy of what it saved. Two things go wrong:
+// anything it could not copy (a screenshot the snipping tool published by
+// delayed rendering, for one) is simply gone, and even when the restore works
+// the clipboard sits empty for a few hundred milliseconds. In an app whose
+// whole job is capturing what you copied, that is unacceptable: it is what made
+// screenshots vanish before Ctrl+Shift+V could paste them. On macOS it was also
+// dishonest, silently returning stale clipboard text as if it were a fresh
+// selection. Explain reads selections through UI Automation / AXAPI only.
+const HOOK_START_OPTS = { enableClipboard: false };
 const WIN_W = 470;
 const WIN_H = 190;
 

@@ -71,10 +71,21 @@ function AssetImage({ node: _node, src, ...props }) {
 }
 
 /**
- * Audio player for voice memos. Recorded WebM files carry no duration
- * metadata (duration reads as Infinity), which leaves the native player's
- * seek bar dead. Forcing a seek past the end makes the browser resolve the
- * real duration, after which the controls behave normally.
+ * Audio player for voice memos.
+ *
+ * Recordings made by Casrion now carry their real length in the file, so the
+ * player knows the duration the moment it reads the header. Memos recorded
+ * before that (and anything else live-muxed) report a duration of Infinity,
+ * and the only way to resolve it is the old trick of seeking far past the end
+ * and letting the browser discover where the audio really stops.
+ *
+ * That trick is a loaded gun. On a file that is not fully in memory the seek
+ * becomes a read past the end of the file, Chromium calls that a fatal
+ * pipeline error, and the player is dead for good — greyed out controls, no
+ * playback, no recovery. So it only fires once the whole file is buffered and
+ * the duration is genuinely missing, and if it does break something the
+ * player reloads without it: a memo that plays but shows no length is a small
+ * annoyance, a memo that refuses to play at all is a lost recording.
  *
  * Failed loads self-heal like images do: retries swap in a cache-busted URL,
  * because Chromium pins the failure to the original URL for a while — a
@@ -90,10 +101,14 @@ function AudioNote({ node: _node, src, ...props }) {
   const [attempt, setAttempt] = useState(0);
   const attemptRef = useRef(0);
   const timerRef = useRef(null);
+  // { armed } — whether the duration trick may still be tried on this file,
+  // { pending } — a trick seek is in flight, so blame it for any error now
+  const seekFixRef = useRef({ armed: true, pending: false });
 
   useEffect(() => {
     // New source — start fresh
     attemptRef.current = 0;
+    seekFixRef.current = { armed: true, pending: false };
     setAttempt(0);
   }, [src]);
 
@@ -103,39 +118,68 @@ function AudioNote({ node: _node, src, ...props }) {
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
+    const fix = seekFixRef.current;
 
-    // MediaRecorder webm/mp4 carries no duration in its header, so the player
-    // reports Infinity until it is forced to seek to the end. Seeking only
-    // works once the bytes are actually buffered, which is why local memos
-    // preload in full (see the element below). Wrapped so a rejected seek on
-    // any platform can never bubble into the error-retry path.
-    const fixDuration = () => {
-      if (el.duration === Infinity || Number.isNaN(el.duration)) {
-        const rewind = () => {
-          try { el.currentTime = 0; } catch { /* nothing to rewind yet */ }
-          el.removeEventListener('seeked', rewind);
-        };
-        el.addEventListener('seeked', rewind);
-        try { el.currentTime = 1e101; } catch { /* seek unsupported until buffered */ }
-      }
+    const durationUnknown = () => el.duration === Infinity || Number.isNaN(el.duration);
+    // HAVE_ENOUGH_DATA, one buffered range starting at zero, and Chromium no
+    // longer fetching (NETWORK_IDLE): the local file is in memory, so a seek
+    // is answered from there instead of becoming a read off the end of it.
+    const fullyBuffered = () => el.readyState >= 4 && el.networkState === 1
+      && el.buffered.length === 1 && el.buffered.start(0) === 0;
+
+    const tryFixDuration = () => {
+      if (!fix.armed || fix.pending || !durationUnknown() || !fullyBuffered()) return;
+      fix.armed = false; // one attempt per file, ever
+      fix.pending = true;
+      const settle = () => {
+        fix.pending = false;
+        el.removeEventListener('seeked', rewind);
+        clearTimeout(fix.timer);
+      };
+      const rewind = () => {
+        try { el.currentTime = 0; } catch { /* nothing to rewind yet */ }
+        settle();
+      };
+      el.addEventListener('seeked', rewind);
+      fix.timer = setTimeout(settle, 3000); // seek never landed: stop blaming it
+      try { el.currentTime = 1e101; } catch { settle(); }
     };
+
     const handleLoaded = () => {
       attemptRef.current = 0;
-      fixDuration();
+      tryFixDuration();
     };
-    const handleError = () => {
-      if (!isLocal || attemptRef.current >= AUDIO_RETRIES) return;
+    const reload = (delay) => {
       attemptRef.current += 1;
       const next = attemptRef.current;
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setAttempt(next), Math.min(retryDelay(next), 8000));
+      timerRef.current = setTimeout(() => setAttempt(next), delay);
+    };
+    const handleError = () => {
+      if (!isLocal) return;
+      if (fix.pending) {
+        // The duration trick did this to itself. Reload at once without it,
+        // and skip the backoff: nothing is actually wrong with the file, and
+        // the successful reload clears the retry count again anyway.
+        fix.pending = false;
+        fix.armed = false;
+        reload(80);
+        return;
+      }
+      if (attemptRef.current >= AUDIO_RETRIES) return;
+      reload(Math.min(retryDelay(attemptRef.current + 1), 8000));
     };
 
     el.addEventListener('loadedmetadata', handleLoaded);
+    el.addEventListener('canplaythrough', tryFixDuration);
+    el.addEventListener('suspend', tryFixDuration);
     el.addEventListener('error', handleError);
     return () => {
       clearTimeout(timerRef.current);
+      clearTimeout(fix.timer);
       el.removeEventListener('loadedmetadata', handleLoaded);
+      el.removeEventListener('canplaythrough', tryFixDuration);
+      el.removeEventListener('suspend', tryFixDuration);
       el.removeEventListener('error', handleError);
     };
   }, [url, isLocal]);

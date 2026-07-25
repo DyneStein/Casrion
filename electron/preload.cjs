@@ -37,7 +37,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Voice Memos
   onStartRecording: (callback) => subscribe('start-recording', callback),
   onStopRecording: (callback) => subscribe('stop-recording', callback),
-  saveAudio: (buffer, mimeType) => ipcRenderer.invoke('save-audio', buffer, mimeType),
+  recordingStarted: () => ipcRenderer.invoke('recording-started'),
+  saveAudio: (buffer, mimeType, durationMs) => ipcRenderer.invoke('save-audio', buffer, mimeType, durationMs),
   recordingFailed: (message) => ipcRenderer.invoke('recording-failed', message),
 
   // Editor & Export
