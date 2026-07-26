@@ -1498,8 +1498,8 @@ async function captureCodeBlock(pendingStamp = null, pre = null) {
 }
 
 function toggleHelpOverlay() {
-  // Normally pre-created shortly after launch; if the hotkey wins that race,
-  // build it now and show it as soon as its page is ready.
+  // Built on first use rather than at launch, so the renderer process only
+  // exists for people who actually open the help panel. Show it once ready.
   if (!helpOverlayWindow || helpOverlayWindow.isDestroyed()) {
     createHelpOverlay();
     helpOverlayWindow.once('ready-to-show', () => {
@@ -2296,14 +2296,17 @@ app.whenReady().then(() => {
     saveSettings
   });
 
-  // The help and quick-note windows exist so their hotkeys open instantly,
-  // but each one is a whole renderer process — keep them off the launch
-  // critical path and build them once the main window is on screen.
+  // The quick-note window exists so its hotkey opens instantly, but a window
+  // is a whole renderer process (~35MB), so only the ones worth that much get
+  // built ahead of time, and never on the launch critical path. The help panel
+  // is deliberately not one of them: it is read once and then never again, and
+  // toggleHelpOverlay already builds it on demand.
   const warmSecondaryWindows = () => {
-    if (!helpOverlayWindow || helpOverlayWindow.isDestroyed()) createHelpOverlay();
     if (!quickInputWindow || quickInputWindow.isDestroyed()) createQuickInputWindow();
-    // Also builds the explain popup and starts the selection watcher so the
-    // hotkey works on text selected before its first use
+    // Starts the selection watcher so the hotkey works on text selected before
+    // its first use. The explain popup, its OCR helper and the model are not
+    // built here: they cost ~1.9GB between them and now wait for a sign the
+    // user actually wants them.
     explainFeature.warmUp();
   };
   mainWindow.once('show', () => setTimeout(warmSecondaryWindows, 1500));

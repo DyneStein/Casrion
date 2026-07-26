@@ -34,7 +34,13 @@ const SYSTEM_PROMPT = [
   'words. No preamble, no headings, no bullet lists. /no_think'
 ].join(' ');
 
-const IDLE_UNLOAD_MS = 15 * 60 * 1000; // free ~1.5GB of RAM when unused
+// A loaded model is ~1.8GB resident, far and away the biggest thing this app
+// holds, so it does not get to linger. Coming back is not free: measured on a
+// warm file cache it is ~9s to push the weights over Vulkan plus ~2s to build
+// the context, so every unload buys back 1.8GB at the price of one ~11s "warming
+// up" wait on the next question. Each answer bumps this timer, so a reading
+// session stays instant throughout and only a real gap in use pays that cost.
+const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 
 let state = 'idle'; // idle | downloading | loading | ready | generating | error
 let lastError = null;

@@ -140,6 +140,7 @@ function initSelectionHook(promptForTrust) {
     hook.on('text-selection', (data) => {
       if (data && data.text && data.text.trim()) {
         lastEventSelection = { data, ts: Date.now() };
+        maybePrewarm();
       }
     });
     // The popup opens without stealing focus, so blur can't dismiss it.
@@ -258,21 +259,46 @@ function createExplainWindow() {
   });
 }
 
-let prewarmScheduled = false;
-
 function warmUp() {
   if (!isEnabled()) return;
-  if (!explainWindow || explainWindow.isDestroyed()) createExplainWindow();
+  // Only the selection watcher starts eagerly: it is cheap, and the hotkey has
+  // to know what was selected before its first use. The popup window, the OCR
+  // helper and the model were all being warmed on a launch timer whether or not
+  // the user ever asked for anything, which came to ~1.9GB and dwarfed the
+  // whole rest of the app. They start on intent now; see maybePrewarm.
   initSelectionHook();
-  // Warm the OCR helper too: its screenshot must beat the popup's paint,
-  // which only works when the PowerShell process is already up
+}
+
+let prewarmed = false;
+
+// Selecting text is the one cheap hint that a question might be coming. Only
+// once per run, and only for someone who has explained something at least once
+// before, does that hint start the load early, so their first double-tap still
+// answers straight away. Someone who never uses the feature never pays a byte,
+// and the once-per-run guard keeps ordinary text selection from dragging the
+// model back in every few minutes for the rest of the day.
+function maybePrewarm() {
+  if (prewarmed || !deps || !isEnabled()) return;
+  if (!deps.getSettings().explainUsed) return;
+  prewarmed = true;
+  // Each of these is warmed here rather than at launch, and each has an
+  // on-demand backstop if the hotkey gets there first: triggerExplain builds
+  // the window, ocrRegion starts the helper, ensureLoaded loads the model.
+  if (!explainWindow || explainWindow.isDestroyed()) createExplainWindow();
+  // The OCR helper is a whole PowerShell process (~70MB) and it has to be up
+  // before the first question, since its screenshot has to beat the popup's paint.
   ocr.startOcrHelper();
-  // Load the model in the background well after launch so the first real
-  // explain answers in a couple of seconds instead of ~20
-  if (!prewarmScheduled && llm.hasModelFile()) {
-    prewarmScheduled = true;
-    setTimeout(() => { llm.prewarm().catch(() => { /* first use loads instead */ }); }, 12000);
+  if (llm.hasModelFile()) {
+    llm.prewarm().catch(() => { /* the first real question loads it instead */ });
   }
+}
+
+function markExplainUsed() {
+  const settings = deps.getSettings();
+  if (settings.explainUsed) return;
+  settings.explainUsed = true;
+  prewarmed = true; // it is loading for this very question already
+  deps.saveSettings();
 }
 
 function validPoint(p) {
@@ -379,6 +405,8 @@ function beginRun(sel) {
     send('explain-status', { state: 'need-model', modelLabel: llm.MODEL_LABEL });
     return;
   }
+  // A real question is about to run, so future sessions may prewarm on selection
+  markExplainUsed();
 
   // Context is captured once per selection, BEFORE the popup paints: the
   // OCR screenshots the pixels around the selection, and the popup sits
