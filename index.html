@@ -4,506 +4,388 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Casrion</title>
-  <meta name="description" content="Casrion grabs whatever you wanna keep and turns it into clean Markdown notes, without pulling you out of what you're doing. Quiet, offline, free.">
+  <meta name="description" content="Casrion turns anything you copy into a finished Markdown note, on one keypress, without pulling you out of what you were reading. Offline, free, no account.">
   <link rel="icon" type="image/png" href="./favicon-32.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 
-  <div class="scroll-progress" aria-hidden="true"></div>
+<div class="wrap">
 
-  <!-- Fixed print furniture -->
-  <div class="crops" aria-hidden="true"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i></div>
-  <div class="margin-note margin-left" aria-hidden="true">CASRION &middot; FIELD MANUAL &middot; 2026</div>
-  <div class="margin-note margin-right" aria-hidden="true">DOC. 001 &middot; WINDOWS &amp; MAC</div>
+  <!-- ══════════════ THE PAGE YOU READ ══════════════ -->
+  <main class="reading" id="reading">
 
-  <div class="sheet">
-
-    <!-- ================= MASTHEAD ================= -->
-    <header class="masthead">
-      <div class="mast-row">
-        <span class="mast-cell mono">DOC. NO. 001</span>
-        <span class="mast-brand">
-          <img src="./logo-64.png" alt="" width="26" height="26">
-          <span class="mast-name">CASRION</span>
-        </span>
-        <span class="mast-cell mono right">WINDOWS &middot; MACOS</span>
-      </div>
-      <div class="rule-double"></div>
-      <div class="mast-sub mono">
-        <span>THE NOTE APP THAT DOES THE BORING PART FOR YOU</span>
-        <nav class="mast-nav">
-          <a href="#contents">CONTENTS</a>
-          <a href="#download">GET IT</a>
-        </nav>
-      </div>
+    <header class="top">
+      <span class="wordmark">
+        <img src="./logo-64.png" alt="" width="24" height="24">
+        Casrion
+      </span>
+      <a class="top-get" href="#get">Download</a>
     </header>
 
-    <!-- ================= HERO ================= -->
-    <section class="hero">
-      <div class="hero-grid">
-        <div class="hero-copy">
-          <p class="kicker mono reveal">FOR PEOPLE WHO SAVE STUFF AND NEVER OPEN IT AGAIN</p>
-          <h1 class="reveal d1">It writes the note.<br>You keep reading.</h1>
-          <p class="lede reveal d2">
-            Casrion just sits there quietly while you read, research, and fall
-            down rabbit holes. Anything you decide to keep turns into a clean,
-            dated note that remembers where it came from, before you even look away.
-          </p>
-          <div class="hero-actions reveal d3">
-            <a class="btn-stamp" href="#download">[ WINDOWS ]</a>
-            <a class="btn-stamp" href="#download-mac">[ MAC ]</a>
-            <span class="hero-meta mono">v1.0.0 &middot; free &middot; no account</span>
-          </div>
-        </div>
+    <h1>A notes app that does the writing&#8209;down part for you.</h1>
 
-        <figure class="frontis reveal d2">
-          <div class="frontis-frame" data-plx="18">
-            <img src="./art/hero.jpg" alt="Sepia field study of a mountain, with a captured note pinned over it" width="1536" height="1024">
-            <div class="frontis-note note-reveal" aria-hidden="true">
-              <div class="fn-head mono"><span>Reading_Notes.md</span><span class="fn-key">CTRL+SHIFT+C</span></div>
-              <p class="fn-line" data-text="You come to know a mountain one long look at a time."><span id="fn-typed"></span><span class="fn-cursor" id="fn-cursor"></span></p>
-              <p class="fn-src mono" id="fn-src">Source: The Living Mountain &middot; 9:41 pm</p>
-            </div>
-          </div>
-          <figcaption class="fig mono">Frontispiece &middot; You kept reading. The note kept itself.</figcaption>
-        </figure>
-      </div>
-    </section>
+    <p class="opening">
+      Here is the thing I could never fix about taking notes. The moment worth
+      keeping and the moment you have time to write it down are never the same
+      moment. You are four paragraphs into something good, you hit a line you
+      want, and the only way to keep it is to leave. Open the app. Find the
+      right file. Paste. Fix the formatting it dragged in. Type out where it
+      came from. By then you have lost the thread you were pulling, and after
+      two or three of those you quietly stop keeping anything at all.
+    </p>
 
-    <!-- ================= EDITIONS ================= -->
-    <section class="editions">
-      <div class="ed-grid">
-        <a class="ed-card reveal" style="--i:0" href="#download">
-          <span class="ed-art" style="background-image:url('./art/ed-windows.jpg')" aria-hidden="true"></span>
-          <span class="ed-eyebrow mono">WINDOWS 10 / 11</span>
-          <span class="ed-name">Windows</span>
-          <span class="ed-btn mono">AVAILABLE NOW</span>
-        </a>
-        <a class="ed-card reveal" style="--i:1" href="#download-mac">
-          <span class="ed-art" style="background-image:url('./art/ed-mac.jpg')" aria-hidden="true"></span>
-          <span class="ed-eyebrow mono">MACOS &middot; APPLE SILICON</span>
-          <span class="ed-name">Mac</span>
-          <span class="ed-btn mono">AVAILABLE NOW</span>
-        </a>
-        <div class="ed-card ed-soon reveal" style="--i:2">
-          <span class="ed-art ed-art-right" style="background-image:url('./art/ed-linux.jpg')" aria-hidden="true"></span>
-          <span class="ed-eyebrow mono">LINUX</span>
-          <span class="ed-name">Linux</span>
-          <span class="ed-btn mono ghost">SOON, HOPEFULLY</span>
-        </div>
-      </div>
-    </section>
+    <p>
+      <span data-auto>So Casrion puts that entire detour on one key. You copy the line, you
+      press the key, you keep reading.</span> The note is already written by the
+      time you look up from the page.
+    </p>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p class="try">
+      Which is easier to show than explain, so this page does it too. Select any
+      sentence here. A little tag will show up next to it. Click the tag.
+    </p>
 
-    <!-- ================= CONTENTS ================= -->
-    <section class="section" id="contents">
-      <header class="sec-head">
-        <span class="sec-index mono">&sect;00</span>
-        <h2>Contents</h2>
-      </header>
-      <ol class="toc">
-        <li class="reveal" style="--i:0"><a href="#procedure"><span class="toc-num mono">01</span><span class="toc-title">How it works</span><span class="leader"></span><span class="toc-ref mono">/procedure</span></a></li>
-        <li class="reveal" style="--i:1"><a href="#instruments"><span class="toc-num mono">02</span><span class="toc-title">What's in the box</span><span class="leader"></span><span class="toc-ref mono">/instruments</span></a></li>
-        <li class="reveal" style="--i:2"><a href="#demonstration"><span class="toc-num mono">03</span><span class="toc-title">See it run</span><span class="leader"></span><span class="toc-ref mono">/demonstration</span></a></li>
-        <li class="reveal" style="--i:3"><a href="#provenance"><span class="toc-num mono">04</span><span class="toc-title">It keeps receipts</span><span class="leader"></span><span class="toc-ref mono">/provenance</span></a></li>
-        <li class="reveal" style="--i:4"><a href="#quickwriter"><span class="toc-num mono">05</span><span class="toc-title">The quick writer</span><span class="leader"></span><span class="toc-ref mono">/quick-writer</span></a></li>
-        <li class="reveal" style="--i:5"><a href="#keyindex"><span class="toc-num mono">06</span><span class="toc-title">Every shortcut</span><span class="leader"></span><span class="toc-ref mono">/key-index</span></a></li>
-        <li class="reveal" style="--i:6"><a href="#specification"><span class="toc-num mono">07</span><span class="toc-title">The specs</span><span class="leader"></span><span class="toc-ref mono">/specification</span></a></li>
-        <li class="reveal" style="--i:7"><a href="#appendix"><span class="toc-num mono">A</span><span class="toc-title">Stuff you might ask</span><span class="leader"></span><span class="toc-ref mono">/appendix-a</span></a></li>
-      </ol>
-    </section>
+    <p class="aside">
+      One honest note: in the app the key is <kbd>Ctrl+Shift+C</kbd>, but your
+      browser has already claimed that one for its developer tools and will not
+      give it back, so on this page you click the tag instead. The headings and
+      undo below do work on the real keys.
+    </p>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <h2 id="shape">It writes it down properly, not just quickly</h2>
 
-    <!-- ================= 01 PROCEDURE ================= -->
-    <section class="section" id="procedure">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;01</span>
-        <h2>How it works</h2>
-        <p class="sec-note mono">THREE SECONDS FROM SEEN TO SAVED</p>
-      </header>
-      <div class="story">
-        <div class="story-visual">
-          <div class="story-plates" data-plx="20">
-            <img class="story-plate is-active" src="./art/story-1.jpg" alt="" loading="lazy" width="1400" height="933">
-            <img class="story-plate" src="./art/story-2.jpg" alt="" loading="lazy" width="1400" height="933">
-            <img class="story-plate" src="./art/story-3.jpg" alt="" loading="lazy" width="1400" height="933">
-          </div>
-          <div class="fig mono" id="story-cap">Fig. 1a &middot; Something worth keeping shows up.</div>
-        </div>
-        <div class="story-steps" id="story-steps">
-          <div class="story-step" data-plate="0" data-cap="Fig. 1a &middot; Something worth keeping shows up.">
-            <span class="ledger-num">1</span>
-            <h3>Copy literally anything</h3>
-            <p>An article, a formula, a screenshot, some random 2am thought. If you can copy it, you can keep it.</p>
-          </div>
-          <div class="story-step" data-plate="1" data-cap="Fig. 1b &middot; One keystroke and it's through.">
-            <span class="ledger-num">2</span>
-            <h3>Hit one hotkey</h3>
-            <p>One key and it lands the way you meant it. Nothing pops up, nothing steals your focus, and you never lose your spot.</p>
-          </div>
-          <div class="story-step" data-plate="2" data-cap="Fig. 1c &middot; On the other side, a finished note.">
-            <span class="ledger-num">3</span>
-            <h3>It's already a note</h3>
-            <p>Clean Markdown, in a file you picked. Open it later and everything's exactly where you left it.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <p>
+      A capture that lands as a wall of unformatted text is barely better than
+      the clipboard. So the key you press decides the shape it arrives in. Grab
+      a definition as a heading, a snippet as a fenced code block, the one line
+      that actually mattered in bold. It is plain Markdown on the other side,
+      in a file you chose, on a disk you own.
+    </p>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p>
+      Try that here as well. Select something above, then press one of these
+      instead of clicking the tag.
+    </p>
 
-    <!-- ================= 02 INSTRUMENTS ================= -->
-    <section class="section" id="instruments">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;02</span>
-        <h2>What's in the box</h2>
-        <p class="sec-note mono">EVERYTHING YOU GET</p>
-      </header>
-      <div class="feat-grid">
-        <article class="feat reveal" style="--i:0">
-          <div class="feat-art tile-burst" aria-hidden="true"></div>
-          <span class="inv-num mono">2.1</span>
-          <h3>Hotkeys that work everywhere</h3>
-          <p>In any app, anywhere. Each one drops your capture in already formatted, exactly how you meant it.</p>
-        </article>
-        <article class="feat reveal" style="--i:1">
-          <div class="feat-art tile-wave" aria-hidden="true"></div>
-          <span class="inv-num mono">2.2</span>
-          <h3>Voice memos</h3>
-          <p>Some thoughts are just faster out loud. Record it, it tucks itself into your note, and it's there whenever you come back.</p>
-        </article>
-        <article class="feat reveal" style="--i:2">
-          <div class="feat-art tile-tunnel" aria-hidden="true"></div>
-          <span class="inv-num mono">2.3</span>
-          <h3>Source stamps</h3>
-          <p>Every capture can quietly remember where it came from. Weeks later, the trail is still warm.</p>
-        </article>
-      </div>
-    </section>
+    <ul class="keylist" id="keylist">
+      <li data-live><span class="k-what">Keep it as it is</span><b class="k-key" data-combo="c">Ctrl+Shift+C</b><span class="k-mine">click the tag</span></li>
+      <li data-live><span class="k-what">Keep it as a heading</span><b class="k-key" data-combo="1" data-mac="Cmd+Shift+1">Ctrl+Shift+1</b><span class="k-mine">works here</span></li>
+      <li data-live><span class="k-what">Smaller heading</span><b class="k-key" data-combo="2" data-mac="Cmd+Shift+2">Ctrl+Shift+2</b><span class="k-mine">works here</span></li>
+      <li data-live><span class="k-what">Smaller still</span><b class="k-key" data-combo="3" data-mac="Cmd+Ctrl+3">Ctrl+Shift+3</b><span class="k-mine">works here</span></li>
+      <li data-live><span class="k-what">Keep it as code</span><b class="k-key" data-combo="k">Ctrl+Shift+K</b><span class="k-mine">works here</span></li>
+      <li data-live><span class="k-what">Keep it bold</span><b class="k-key" data-combo="b">Ctrl+Shift+B</b><span class="k-mine">browser took it</span></li>
+      <li data-live><span class="k-what">Keep it italic</span><b class="k-key" data-combo="i">Ctrl+Shift+I</b><span class="k-mine">browser took it</span></li>
+      <li data-live><span class="k-what">Undo the last one</span><b class="k-key" data-combo="z">Ctrl+Shift+Z</b><span class="k-mine">works here</span></li>
+      <li><span class="k-what">Keep a screenshot</span><b class="k-key">Ctrl+Shift+V</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Record a voice memo</span><b class="k-key">Ctrl+Shift+M</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Open the quick writer</span><b class="k-key" data-mac="Cmd+Shift+J">Ctrl+Shift+Q</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Explain what you selected</span><b class="k-key" data-mac="Cmd+Shift+E">Ctrl+Shift+E</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Start a new paragraph</span><b class="k-key">Ctrl+Shift+N</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Keep it in red, green, blue</span><b class="k-key" data-mac="Cmd+Ctrl+R / G / B">Alt+R / G / B</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Show every shortcut</span><b class="k-key">Ctrl+Shift+H</b><span class="k-mine">in the app</span></li>
+    </ul>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p class="footnote" id="mac-keynote" hidden>
+      You are on a Mac, so the keys above are showing their Mac versions. A few
+      of them are not a straight Ctrl to Cmd swap, because macOS keeps some of
+      those combinations for itself.
+    </p>
 
-    <!-- ================= 03 DEMONSTRATION ================= -->
-    <section class="section" id="demonstration">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;03</span>
-        <h2>See it run</h2>
-        <p class="sec-note mono">WATCH IT BEFORE YOU INSTALL IT</p>
-      </header>
-      <figure class="film reveal">
-        <div class="film-frame">
-          <!-- Replace the placeholder below with the walkthrough embed, e.g.
-               <iframe src="https://www.youtube.com/embed/VIDEO_ID" title="Casrion walkthrough" allowfullscreen></iframe>
-               or a self-hosted file:
-               <video controls preload="metadata" src="./casrion-demo.mp4"></video> -->
-          <div class="film-slot mono">
-            <span class="film-badge">REEL 1</span>
-            <p>FULL WALKTHROUGH DROPS HERE SOON.</p>
-          </div>
-        </div>
-        <figcaption class="fig mono">Reel 1 &middot; Casrion in use, from copy to finished note.</figcaption>
-      </figure>
-    </section>
+    <h2 id="source">It remembers where you got it</h2>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p>
+      A quote with no source is half a note. You will read it back in November
+      and have no idea whether you agreed with it or were arguing with it. So
+      every capture can carry a small stamp: the page it came from, the app it
+      was in, the time you took it. Look at the notebook next to this text and
+      you will see the stamps piling up under everything you kept.
+    </p>
 
-    <!-- ================= 03 PROVENANCE ================= -->
-    <section class="section" id="provenance">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;04</span>
-        <h2>It keeps receipts</h2>
-        <p class="sec-note mono">EVERY FACT REMEMBERS WHERE IT CAME FROM</p>
-      </header>
-      <div class="twocol">
-        <div class="col-copy reveal">
-          <p>
-            A note with no source is kind of half a note. Flip on the paperclip
-            and every passage quietly keeps track of where you found it, so weeks
-            later it can take you right back there.
-          </p>
-          <ul class="plain-list">
-            <li>Every capture keeps its own receipts</li>
-            <li>The way back is always one click away</li>
-            <li>Totally optional, totally yours</li>
-          </ul>
-        </div>
-        <figure class="specimen reveal d2">
-          <figcaption class="spec-tag mono">SPECIMEN A</figcaption>
-          <div class="paper paper-static">
-            <div class="paper-head mono">Perspective_in_Painting.md</div>
-            <div class="paper-body">
-              <p class="pl">The vanishing point sits on the horizon line, and every orthogonal in the scene converges toward it.</p>
-              <p class="pl src">Source: Perspective - Wikipedia &middot; en.wikipedia.org/wiki/Perspective &middot; 9:42 pm</p>
-            </div>
-          </div>
-          <figcaption class="fig mono">Fig. 2 &middot; A passage and where it came from, kept together.</figcaption>
-        </figure>
-      </div>
-    </section>
+    <p>
+      It is one toggle, and it is off if you want it off. There is a checkbox
+      on the notebook. Turn it off and watch the stamps go.
+    </p>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <h2 id="explain">When you have no idea what you are looking at</h2>
 
-    <!-- ================= 04 QUICK WRITER ================= -->
-    <section class="section" id="quickwriter">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;05</span>
-        <h2>The quick writer</h2>
-        <p class="sec-note mono">YOUR OWN THOUGHTS, WITHOUT BREAKING FLOW</p>
-      </header>
-      <div class="twocol">
-        <div class="col-copy reveal">
-          <p>
-            Not everything is a copy-paste. Some notes start in your own head, and
-            for those a tiny writer floats over whatever you're doing, catches the
-            thought, and disappears before your brain moves on.
-          </p>
-          <ul class="plain-list">
-            <li>Shows up anywhere, vanishes on its own</li>
-            <li>Markdown works as you type</li>
-            <li>Drafts stick around if life interrupts</li>
-          </ul>
-        </div>
-        <figure class="specimen reveal d2">
-          <figcaption class="spec-tag mono">SPECIMEN B</figcaption>
-          <div class="paper paper-static">
-            <div class="paper-head mono">Quick note &rarr; Perspective_in_Painting.md</div>
-            <div class="paper-body qw">
-              <pre class="qw-typed mono" id="q-typed"></pre><span class="paper-cursor on" id="q-cursor"></span>
-            </div>
-            <div class="qw-hint mono"><b>Enter</b> add &middot; <b>Ctrl+Enter</b> add and keep writing &middot; <b>Esc</b> close</div>
-          </div>
-          <figcaption class="fig mono">Fig. 3 &middot; The quick writer, mid thought.</figcaption>
-        </figure>
-      </div>
-    </section>
+    <p>
+      Sometimes the problem is not keeping the sentence, it is that the
+      sentence means nothing to you yet. Select it, tap <kbd>Ctrl</kbd> twice,
+      and a small window explains it where you are standing, in whatever app
+      you are standing in. It reads the window around your selection too, so it
+      knows a stray symbol is part of the formula three lines up.
+    </p>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p>
+      That runs on a language model living on your own disk. Nothing is sent
+      anywhere. It is a one time download of about a gigabyte, and it stays out
+      of your way until you ask: it does not load at launch, it loads the first
+      time you look like you are about to need it, and it hands the memory back
+      about five minutes after you stop. Idle, the whole app sits under
+      <span class="num">450 MB</span>.
+    </p>
 
-    <!-- ================= 05 KEY INDEX ================= -->
-    <section class="section" id="keyindex">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;06</span>
-        <h2>Every shortcut</h2>
-        <p class="sec-note mono">LEARN FIVE, THE REST JUST STICK</p>
-        <p class="sec-note mono kbd-mac-note" hidden>SHOWING MAC KEYS &middot; CMD REPLACES CTRL</p>
-      </header>
-      <div class="keys">
-        <div class="key-row reveal" style="--i:0"><span>Capture copied text</span><span class="leader"></span><kbd>Ctrl+Shift+C</kbd></div>
-        <div class="key-row reveal" style="--i:1"><span>Capture as heading</span><span class="leader"></span><kbd data-mac="Cmd+Shift+1/2, Cmd+Ctrl+3">Ctrl+Shift+1..3</kbd></div>
-        <div class="key-row reveal" style="--i:2"><span>Capture screenshot</span><span class="leader"></span><kbd>Ctrl+Shift+V</kbd></div>
-        <div class="key-row reveal" style="--i:3"><span>Capture code block</span><span class="leader"></span><kbd>Ctrl+Shift+K</kbd></div>
-        <div class="key-row reveal" style="--i:4"><span>Record voice memo</span><span class="leader"></span><kbd>Ctrl+Shift+M</kbd></div>
-        <div class="key-row reveal" style="--i:5"><span>Quick note popup</span><span class="leader"></span><kbd data-mac="Cmd+Shift+J">Ctrl+Shift+Q</kbd></div>
-        <div class="key-row reveal" style="--i:6"><span>New paragraph</span><span class="leader"></span><kbd>Ctrl+Shift+N</kbd></div>
-        <div class="key-row reveal" style="--i:7"><span>Capture bold</span><span class="leader"></span><kbd>Ctrl+Shift+B</kbd></div>
-        <div class="key-row reveal" style="--i:8"><span>Capture italic</span><span class="leader"></span><kbd>Ctrl+Shift+I</kbd></div>
-        <div class="key-row reveal" style="--i:9"><span>Capture in color</span><span class="leader"></span><kbd data-mac="Cmd+Ctrl+R / G / B">Alt+R / G / B</kbd></div>
-        <div class="key-row reveal" style="--i:10"><span>Explain selection</span><span class="leader"></span><kbd data-mac="Cmd+Shift+E">Ctrl+Shift+E</kbd></div>
-        <div class="key-row reveal" style="--i:11"><span>Undo last capture</span><span class="leader"></span><kbd>Ctrl+Shift+Z</kbd></div>
-        <div class="key-row reveal" style="--i:12"><span>Shortcut overlay</span><span class="leader"></span><kbd>Ctrl+Shift+H</kbd></div>
-      </div>
-    </section>
+    <h2 id="quick">When the thought is your own</h2>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+    <p>
+      Not everything worth keeping is something you copied. For the ones that
+      start in your own head, a small writer floats over whatever you are doing,
+      takes the thought, and vanishes. Markdown works while you type it. If you
+      get interrupted halfway, and you will, the draft is still sitting there
+      when you come back.
+    </p>
 
-    <!-- ================= 06 SPECIFICATION ================= -->
-    <section class="section" id="specification">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;07</span>
-        <h2>The specs</h2>
-        <p class="sec-note mono">THE WHOLE TRUTH, IN ONE TABLE</p>
-      </header>
-      <div class="spec-wrap">
-        <table class="spec reveal">
-          <tbody>
-            <tr><th class="mono">VERSION</th><td>1.0.0</td></tr>
-            <tr><th class="mono">PLATFORM</th><td>Windows 10 / 11 &middot; macOS 11+ (Apple Silicon)</td></tr>
-            <tr><th class="mono">SIZE</th><td>About 100 MB installed</td></tr>
-            <tr><th class="mono">FORMAT</th><td>Plain Markdown files</td></tr>
-            <tr><th class="mono">STORAGE</th><td>Folders you choose, on your disk</td></tr>
-            <tr><th class="mono">NETWORK REQUESTS</th><td>None</td></tr>
-            <tr><th class="mono">ACCOUNT REQUIRED</th><td>None</td></tr>
-            <tr><th class="mono">TELEMETRY</th><td>None</td></tr>
-            <tr><th class="mono">PRICE</th><td>Free</td></tr>
-          </tbody>
-        </table>
-        <div class="stamp mono stamp-reveal" aria-hidden="true">RUNS ENTIRELY<br>ON YOUR MACHINE</div>
-      </div>
-    </section>
+    <h2 id="voice">Or say it out loud</h2>
 
-    <!-- ================= PRIVACY BAND ================= -->
-    <section class="band" data-plx="56" aria-label="Privacy">
-      <img class="band-img" src="./art/band.jpg" alt="" loading="lazy" width="1600" height="1067">
-      <figure class="band-quote reveal">
-        <p class="band-kicker mono">PLATE IV &middot; PRIVATE BY CONSTRUCTION</p>
-        <blockquote class="pull">
-          No account. No cloud.<br><em>No one reading over your shoulder.</em>
-        </blockquote>
-        <p class="band-sub mono">CASRION MAKES ZERO NETWORK REQUESTS. THE RECORD STAYS ON YOUR MACHINE.</p>
-      </figure>
-    </section>
+    <p>
+      Some thoughts come out faster than you can type them, and the typing kills
+      them on the way. Hold the key, say it, let go. The recording tucks itself
+      into the note next to everything else, and it is a normal audio file in a
+      normal folder, so it will still play in ten years when this app is long
+      gone.
+    </p>
 
-    <!-- ================= GET CASRION ================= -->
-    <section class="section" id="download">
-      <div class="coupon reveal">
-        <div class="coupon-head mono">
-          <span>CASRION</span><span>VERSION 1.0.0</span><span>WINDOWS INSTALLER</span><span>FREE</span>
-        </div>
-        <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
-        <h2>Okay, go get it.</h2>
-        <p class="coupon-lead">No email, no sign-up, no nothing. One click and it is yours.</p>
+    <!-- Screenshot slot. When there is a real one, drop it in here:
+         <figure class="shot">
+           <img src="./art/screenshot.png" alt="Casrion with a note open" width="1400" height="900">
+           <figcaption>Casrion, mid session.</figcaption>
+         </figure>
+    -->
 
-        <!-- Direct download. /get 302-redirects to the installer, so the
-             version lives in one place (see vercel.json). -->
-        <p class="dl-wrap">
-          <a class="btn-stamp big" href="/get">[ DOWNLOAD FOR WINDOWS ]</a>
+    <h2 id="private">Nothing leaves your machine</h2>
+
+    <p>
+      This is not a privacy policy, it is an architecture. Casrion makes no
+      network requests. Not fewer than most, none. There is no account to make,
+      no sync server it is quietly reaching, no analytics counting your
+      keypresses. Your notes are Markdown files in folders you picked, and if
+      you delete the app tomorrow every one of them is still readable in
+      Notepad.
+    </p>
+
+    <table class="spec">
+      <tr><th>Version</th><td>1.0.0</td></tr>
+      <tr><th>Runs on</th><td>Windows 10 and 11, macOS 11+ on Apple Silicon</td></tr>
+      <tr><th>Install size</th><td>about 100 MB</td></tr>
+      <tr><th>Idle memory</th><td>about 450 MB</td></tr>
+      <tr><th>Your notes</th><td>plain Markdown, in folders you choose</td></tr>
+      <tr><th>Network requests</th><td>none</td></tr>
+      <tr><th>Account</th><td>none</td></tr>
+      <tr><th>Telemetry</th><td>none</td></tr>
+      <tr><th>Price</th><td>free</td></tr>
+    </table>
+
+    <h2 id="get">Go get it</h2>
+
+    <p>
+      No email, no sign up, no newsletter waiting on the other side of the
+      button. It is one click and then it is yours.
+    </p>
+
+    <p class="grab">
+      <a class="btn" href="/get">Download for Windows</a>
+      <a class="btn btn-quiet" href="/get-mac">Download for Mac</a>
+    </p>
+
+    <p class="footnote">
+      The Windows installer is unsigned, because the certificate costs more than
+      this app makes, so SmartScreen will put up a blue box the first time.
+      Click <b>More info</b>, then <b>Run anyway</b>. Once, and never again.
+      The Mac build needs a few permissions, which are all below.
+    </p>
+
+    <h2 id="mac">Mac needs about two minutes of setup</h2>
+
+    <p>
+      Apple wants money for a signature too, so macOS treats Casrion as a
+      stranger the first time. Here is the whole thing, in order, and then it is
+      done forever.
+    </p>
+
+    <ol class="setup">
+      <li>
+        <h3>Install it</h3>
+        <p>Open the <code>.dmg</code> and drag Casrion into <b>Applications</b>.</p>
+      </li>
+      <li>
+        <h3>Open it the first time</h3>
+        <p>
+          Because it is not from the App Store, the first launch gets blocked.
+          In <b>Applications</b>, <b>right click</b> Casrion and choose
+          <b>Open</b>, then <b>Open</b> again in the dialog. If it still refuses
+          and says it cannot be opened, paste this into <b>Terminal</b> once and
+          then open it normally:
         </p>
-
-        <p class="coupon-note mono">Heads up: the installer is unsigned, so Windows might throw a SmartScreen notice the first time you run it. Totally normal, see question A.1 below.</p>
-        <p class="coupon-star mono">and hey, if you read source code for fun, pweez <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">star the repo</a> &#9733; it genuinely makes my day.</p>
-      </div>
-    </section>
-
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
-
-    <!-- ================= GET CASRION (MAC) ================= -->
-    <section class="section" id="download-mac">
-      <div class="coupon reveal">
-        <div class="coupon-head mono">
-          <span>CASRION</span><span>VERSION 1.0.0</span><span>MACOS &middot; APPLE SILICON</span><span>FREE</span>
-        </div>
-        <img class="coupon-logo" src="./logo.png" alt="Casrion logo" width="84" height="84">
-        <h2>On a Mac? Grab it here.</h2>
-        <p class="coupon-lead">Built for Apple Silicon (M1 and newer). Same Casrion, with <b>Cmd</b> where Windows uses Ctrl.</p>
-
-        <!-- /get-mac 302-redirects to the .dmg, so the version lives in one place. -->
-        <p class="dl-wrap">
-          <a class="btn-stamp big" href="/get-mac">[ DOWNLOAD FOR MAC ]</a>
+        <p class="code-line"><code>xattr -cr /Applications/Casrion.app</code></p>
+      </li>
+      <li>
+        <h3>Allow Accessibility, for Explain</h3>
+        <p>
+          Explain has to read the text you highlighted. Go to <b>System Settings
+          &rarr; Privacy &amp; Security &rarr; Accessibility</b> and switch
+          <b>Casrion</b> on. Casrion opens that pane for you the first time you
+          try to explain something.
         </p>
+      </li>
+      <li>
+        <h3>Allow Input Monitoring, for the double tap</h3>
+        <p>
+          macOS guards raw key taps separately from everything else, so if you
+          want the double tap of <b>Cmd</b> to work, switch <b>Casrion</b> on
+          under <b>Input Monitoring</b> as well. Do not want to? Skip it.
+          <kbd>Cmd+Shift+E</kbd> only needs the step above.
+        </p>
+      </li>
+      <li>
+        <h3>Allow the microphone, for voice memos</h3>
+        <p>macOS asks the first time you record. Click <b>Allow</b>.</p>
+      </li>
+      <li>
+        <h3>Say yes to the browser question, for source stamps</h3>
+        <p>
+          The first capture out of Safari or Chrome makes macOS ask whether
+          Casrion can control the browser. That question is how your notes get
+          stamped with the exact page. Say no and captures still note which app
+          they came from, just without the address.
+        </p>
+      </li>
+      <li>
+        <h3>Quit and reopen once</h3>
+        <p>
+          macOS only applies those switches to a fresh launch. Quit Casrion
+          properly from the menu bar icon and open it again. Setup only, never
+          again.
+        </p>
+      </li>
+    </ol>
 
-        <p class="coupon-note mono">The app is unsigned, so macOS needs a couple of one-time permissions before everything works. It takes two minutes. Here is the whole thing:</p>
+    <h2 id="questions">Questions people actually ask</h2>
 
-        <ol class="mac-setup">
-          <li class="setup-step">
-            <span class="setup-num mono">01</span>
-            <div class="setup-body">
-              <h3>Install it</h3>
-              <p>Open the downloaded <span class="mono">.dmg</span>, then drag the Casrion icon into your <b>Applications</b> folder.</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">02</span>
-            <div class="setup-body">
-              <h3>Open it the first time</h3>
-              <p>Because it is not from the App Store, macOS blocks the first launch. Open <b>Applications</b>, <b>right-click</b> Casrion and choose <b>Open</b>, then <b>Open</b> again in the dialog. If macOS still refuses (&ldquo;can&rsquo;t be opened&rdquo;), open <b>Terminal</b> and paste this once, then open the app normally:</p>
-              <p class="setup-code mono">xattr -cr /Applications/Casrion.app</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">03</span>
-            <div class="setup-body">
-              <h3>Allow Accessibility &mdash; for Explain</h3>
-              <p>The Explain feature reads the text you highlight. Go to <b>System Settings &rarr; Privacy &amp; Security &rarr; Accessibility</b> and turn <b>Casrion</b> on. This powers <span class="mono">Cmd+Shift+E</span> and the double-tap gesture. (Casrion opens this pane for you the first time you try to explain something.)</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">04</span>
-            <div class="setup-body">
-              <h3>Allow Input Monitoring &mdash; for double-tap Cmd</h3>
-              <p>Want to trigger Explain by tapping <b>Cmd twice</b>? macOS guards raw key taps separately, so also turn <b>Casrion</b> on under <b>System Settings &rarr; Privacy &amp; Security &rarr; Input Monitoring</b>. Prefer not to? Skip this one and just use <span class="mono">Cmd+Shift+E</span>, which needs only step 03.</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">05</span>
-            <div class="setup-body">
-              <h3>Allow the Microphone &mdash; for voice memos</h3>
-              <p>The first time you record a voice memo, macOS asks for microphone access. Click <b>Allow</b>. That is it.</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">06</span>
-            <div class="setup-body">
-              <h3>Say yes to the browser question &mdash; for source stamps</h3>
-              <p>The first time you capture something from Safari or Chrome, macOS asks &ldquo;Casrion wants access to control Safari&rdquo;. Click <b>Allow</b>. That is how your notes get stamped with the exact page they came from. If you decline, captures still note which app they came from, just without the web address.</p>
-            </div>
-          </li>
-          <li class="setup-step">
-            <span class="setup-num mono">07</span>
-            <div class="setup-body">
-              <h3>Quit and reopen once</h3>
-              <p>After turning on any permission above, fully quit Casrion from the menu-bar icon and open it again so macOS applies the change. You only do this at setup.</p>
-            </div>
-          </li>
-        </ol>
+    <dl class="qa">
+      <dt>Windows says it protected my PC. Is that bad?</dt>
+      <dd>
+        No. That is SmartScreen, and it appears for any installer without an
+        expensive code signing certificate. It does not mean something was
+        found. <b>More info</b>, then <b>Run anyway</b>.
+      </dd>
 
-        <p class="coupon-star mono">tip: the Casrion menu-bar icon has an &ldquo;Explain permissions&rdquo; shortcut that jumps you straight to the right settings panes.</p>
-      </div>
-    </section>
+      <dt>Where do my notes actually live?</dt>
+      <dd>
+        In Markdown files, in folders you pick. Screenshots and voice memos sit
+        in an assets folder right beside each note. Move them, back them up, put
+        them in Dropbox, open them in something else. They are just files.
+      </dd>
 
-    <div class="divider mono" aria-hidden="true">-/= + | + =\- ~ -/= + | + =\-</div>
+      <dt>Does it need internet?</dt>
+      <dd>
+        Never. The one exception is the optional Explain model, which is a
+        single download the first time you turn it on, and after that even that
+        works on a plane.
+      </dd>
 
-    <!-- ================= APPENDIX A ================= -->
-    <section class="section" id="appendix">
-      <header class="sec-head reveal">
-        <span class="sec-index mono">&sect;A</span>
-        <h2>Stuff you might ask</h2>
-        <p class="sec-note mono">FAIR QUESTIONS, STRAIGHT ANSWERS</p>
-      </header>
+      <dt>How much memory does it use?</dt>
+      <dd>
+        Around 450 MB sitting idle. If you use Explain it climbs while the model
+        is loaded and drops back about five minutes after you stop asking
+        things.
+      </dd>
 
-      <details class="qa reveal" style="--i:0">
-        <summary><span class="qa-num mono">A.1</span>Windows says "Windows protected your PC". Is that safe?</summary>
-        <p>Yep, safe. That is just Microsoft SmartScreen, and it pops up for any installer that is not signed with a (pricey) certificate. It does not mean anything bad was found. Hit <b>More info</b>, then <b>Run anyway</b>. You will see it once, at install, and never again.</p>
-      </details>
-      <details class="qa reveal" style="--i:1">
-        <summary><span class="qa-num mono">A.2</span>Where do my notes live?</summary>
-        <p>In plain Markdown files, inside folders you pick yourself. Screenshots and voice memos sit in an assets folder right next to each note. Open, move, back up or sync them with whatever you like.</p>
-      </details>
-      <details class="qa reveal" style="--i:2">
-        <summary><span class="qa-num mono">A.3</span>Does it need internet?</summary>
-        <p>Nope. Casrion is fully offline. No account, no sync servers, no analytics, nothing. Works the same on a plane as it does at home.</p>
-      </details>
-      <details class="qa reveal" style="--i:3">
-        <summary><span class="qa-num mono">A.4</span>How do I quit or update it?</summary>
-        <p>Closing the window keeps it capturing from the tray. To fully quit, right-click the tray icon and choose Quit. To update, grab the newer installer here and run it over your existing one. Your notes never get touched.</p>
-      </details>
-      <details class="qa reveal" style="--i:4">
-        <summary><span class="qa-num mono">A.5</span>Do I need an account or my email?</summary>
-        <p>Nope. Hit the button and the download just starts. No address, no sign-up, no newsletter sneaking into your inbox. That is the whole deal.</p>
-      </details>
-      <details class="qa reveal" style="--i:5">
-        <summary><span class="qa-num mono">A.6</span>Download did not start, or I want the latest?</summary>
-        <p>Just hit the button again, the link always grabs the current version. If your browser is being weird, right-click it and choose <b>Save link as</b>. Still stuck? Ping me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.</p>
-      </details>
-      <details class="qa reveal" style="--i:6">
-        <summary><span class="qa-num mono">A.7</span>On my Mac it says Casrion &ldquo;can&rsquo;t be opened&rdquo;. Now what?</summary>
-        <p>That is macOS being cautious about an app that is not from the App Store, not a problem with Casrion. After dragging it to Applications, <b>right-click</b> the app and choose <b>Open</b>, then <b>Open</b> again. If it still refuses, open <b>Terminal</b> and run <span class="mono">xattr -cr /Applications/Casrion.app</span> once, then open it normally. Full walkthrough is in the <a href="#download-mac">Mac setup steps</a> above.</p>
-      </details>
-      <details class="qa reveal" style="--i:7">
-        <summary><span class="qa-num mono">A.8</span>Which Macs does it run on?</summary>
-        <p>Apple Silicon Macs (M1 and newer), on macOS 11 or later. Older Intel Macs are not supported yet.</p>
-      </details>
-      <details class="qa reveal" style="--i:8">
-        <summary><span class="qa-num mono">A.9</span>On Mac, Explain says it needs permission, or the double-tap Cmd does nothing.</summary>
-        <p>Explain uses two separate macOS permissions. <b>Accessibility</b> lets it read your highlighted text (needed for <span class="mono">Cmd+Shift+E</span> and the double-tap). <b>Input Monitoring</b> lets it notice the double-tap of the Cmd key. Turn Casrion on under <b>System Settings &rarr; Privacy &amp; Security</b> for each, then quit and reopen Casrion. If you only grant Accessibility, <span class="mono">Cmd+Shift+E</span> still works fine. The Casrion menu-bar icon has an &ldquo;Explain permissions&rdquo; shortcut to the exact panes.</p>
-      </details>
-      <details class="qa reveal" style="--i:9">
-        <summary><span class="qa-num mono">A.10</span>I updated Casrion on my Mac and a permission stopped working.</summary>
-        <p>macOS ties those permissions to the exact copy of the app, so after replacing Casrion with a newer version the old checkmarks can quietly stop counting even though they still look on. The fix takes a minute: in <b>System Settings &rarr; Privacy &amp; Security</b>, open <b>Accessibility</b> and <b>Input Monitoring</b>, remove Casrion from the list with the <b>&minus;</b> button, add it back with <b>+</b> (it lives in Applications), then quit and reopen the app.</p>
-      </details>
-    </section>
+      <dt>How do I quit it, or update it?</dt>
+      <dd>
+        Closing the window leaves it capturing from the tray, which is the
+        point. To really quit, right click the tray icon and choose Quit. To
+        update, download the newer installer and run it over the old one. Your
+        notes are never touched.
+      </dd>
 
-    <!-- ================= COLOPHON ================= -->
+      <dt>Do I need an account?</dt>
+      <dd>No. There is nothing to sign up for. There is no server to sign up to.</dd>
+
+      <dt>My Mac says Casrion cannot be opened.</dt>
+      <dd>
+        That is macOS being careful about an unsigned app, not a problem with
+        the app. Right click it in Applications and choose <b>Open</b>, then
+        <b>Open</b> again. If it still refuses, run
+        <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.
+        Full walkthrough is <a href="#mac">up in the Mac setup</a>.
+      </dd>
+
+      <dt>Which Macs?</dt>
+      <dd>Apple Silicon, M1 and newer, on macOS 11 or later. Intel Macs are not supported yet.</dd>
+
+      <dt>I updated on Mac and a permission stopped working.</dt>
+      <dd>
+        macOS ties permissions to the exact copy of the app, so replacing
+        Casrion with a new version can quietly invalidate the checkmarks while
+        they still look switched on. In <b>Privacy &amp; Security</b>, open
+        <b>Accessibility</b> and <b>Input Monitoring</b>, remove Casrion with
+        <b>&minus;</b>, add it back with <b>+</b>, then quit and reopen.
+      </dd>
+
+      <dt>The download did not start.</dt>
+      <dd>
+        Press the button again, it always points at the current version. If your
+        browser is being strange, right click and choose <b>Save link as</b>.
+        Still stuck, mail me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
+      </dd>
+    </dl>
+
     <footer class="colophon">
-      <div class="rule-double"></div>
-      <p class="mono">CASRION &middot; A QUIET LITTLE THING FOR PEOPLE WHO TAKE NOTES</p>
-      <p class="mono end">+ END OF DOCUMENT +</p>
+      <p>
+        Casrion is free, it is one person's app, and it will stay offline. If
+        you read source code for fun the whole thing is
+        <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>,
+        and a star genuinely makes my day.
+      </p>
+      <p class="sign">Built in a lot of evenings. Go keep something.</p>
     </footer>
 
-  </div>
+  </main>
 
-  <script src="./main.js"></script>
+  <!-- ══════════════ THE NOTEBOOK THAT FILLS UP ══════════════ -->
+  <aside class="rail">
+    <div class="book" id="book">
+      <div class="book-bar">
+        <span class="book-name">Casrion.md</span>
+        <span class="book-count" id="count">empty</span>
+      </div>
+
+      <div class="book-page" id="page">
+        <div class="entries" id="entries"></div>
+        <p class="book-hint" id="hint">
+          Nothing kept yet. Select a sentence on the left and a tag will show up.
+        </p>
+      </div>
+
+      <div class="book-foot">
+        <label class="src-toggle">
+          <input type="checkbox" id="src-on" checked>
+          <span>keep sources</span>
+        </label>
+        <div class="book-acts">
+          <button type="button" id="clear" class="mini">clear</button>
+          <button type="button" id="save" class="mini mini-go">save .md</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- floating capture tag -->
+<button type="button" class="tag" id="tag" hidden>
+  <span class="tag-do">keep this</span>
+  <span class="tag-key" id="tag-key">Ctrl+Shift+C</span>
+</button>
+
+<!-- mobile handle for the notebook -->
+<button type="button" class="drawer-tab" id="drawer-tab" hidden>
+  <span id="drawer-label">Casrion.md</span>
+</button>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="./main.js"></script>
 </body>
 </html>

@@ -1,177 +1,411 @@
-// Casrion field manual site. No dependencies.
+// casrion.com. The page keeps notes on itself, the same way the app does.
+// No dependencies, no build step.
 (function () {
   'use strict';
 
+  var reading   = document.getElementById('reading');
+  var entriesEl = document.getElementById('entries');
+  var pageEl    = document.getElementById('page');
+  var hintEl    = document.getElementById('hint');
+  var countEl   = document.getElementById('count');
+  var tagEl     = document.getElementById('tag');
+  var tagKeyEl  = document.getElementById('tag-key');
+  var saveBtn   = document.getElementById('save');
+  var clearBtn  = document.getElementById('clear');
+  var srcBox    = document.getElementById('src-on');
+  var railEl    = document.querySelector('.rail');
+  var drawerTab = document.getElementById('drawer-tab');
+  var drawerLbl = document.getElementById('drawer-label');
+  var toastEl   = document.getElementById('toast');
+
+  var isMac   = /Mac|iPhone|iPad/i.test(navigator.platform) || /Mac OS X/i.test(navigator.userAgent);
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var search = location.search;
-  var instant = reduced ||
-    search.indexOf('noanim') !== -1 ||
-    search.indexOf('shots') !== -1 ||
-    !('IntersectionObserver' in window);
+  var narrow  = function () { return window.matchMedia('(max-width: 63rem)').matches; };
 
-  /* Scroll progress hairline */
-  var progress = document.querySelector('.scroll-progress');
-  function onScroll() {
-    if (!progress) return;
-    var doc = document.documentElement;
-    var max = doc.scrollHeight - window.innerHeight;
-    progress.style.transform = 'scaleX(' + (max > 0 ? window.scrollY / max : 0) + ')';
-  }
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  var entries = [];
+  var nextId  = 1;
+  var demoDone = false;
 
-  /* Split each ASCII divider into characters for a staggered fade */
-  document.querySelectorAll('.divider').forEach(function (div) {
-    var text = div.textContent;
-    div.textContent = '';
-    for (var i = 0; i < text.length; i++) {
-      var s = document.createElement('span');
-      s.textContent = text[i];
-      s.style.setProperty('--d', (i * 22) + 'ms');
-      div.appendChild(s);
-    }
-  });
-
-  /* Reveal on scroll. Elements already in the viewport reveal immediately. */
-  var targets = document.querySelectorAll('.reveal, .stamp-reveal, .note-reveal, .divider');
-  if (instant) {
-    document.documentElement.classList.add('no-anim');
-    targets.forEach(function (el) { el.classList.add('in-view'); });
-  } else {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) {
-          e.target.classList.add('in-view');
-          io.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.12, rootMargin: '0px 0px -30px 0px' });
-    targets.forEach(function (el) {
-      if (el.getBoundingClientRect().top < window.innerHeight) {
-        el.classList.add('in-view');
-      } else {
-        io.observe(el);
-      }
-    });
-  }
-
-  /* ── Story: plates crossfade as steps scroll by ── */
-  var steps = document.querySelectorAll('.story-step');
-  var plates = document.querySelectorAll('.story-plate');
-  var storyCap = document.getElementById('story-cap');
-
-  function setPlate(step) {
-    var idx = parseInt(step.getAttribute('data-plate'), 10) || 0;
-    plates.forEach(function (p, i) { p.classList.toggle('is-active', i === idx); });
-    steps.forEach(function (s) { s.classList.toggle('is-current', s === step); });
-    if (storyCap) storyCap.textContent = step.getAttribute('data-cap') || '';
-  }
-
-  if (steps.length && !instant) {
-    setPlate(steps[0]);
-    var storyIo = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) setPlate(e.target);
-      });
-    }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
-    steps.forEach(function (s) { storyIo.observe(s); });
-  } else if (steps.length) {
-    steps.forEach(function (s) { s.classList.add('is-current'); });
-  }
-
-  /* ── Masked parallax: images drift inside frames ── */
-  var plxFrames = [];
-  document.querySelectorAll('[data-plx]').forEach(function (el) {
-    plxFrames.push({ el: el, strength: parseFloat(el.getAttribute('data-plx')) || 24 });
-  });
-
-  if (plxFrames.length && !instant) {
-    var ticking = false;
-    var applyParallax = function () {
-      ticking = false;
-      var vh = window.innerHeight;
-      plxFrames.forEach(function (f) {
-        var r = f.el.getBoundingClientRect();
-        if (r.bottom < -80 || r.top > vh + 80) return;
-        var progress = (r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2);
-        if (progress > 1) progress = 1;
-        if (progress < -1) progress = -1;
-        f.el.style.setProperty('--plx', (progress * f.strength).toFixed(1) + 'px');
-      });
-    };
-    var requestParallax = function () {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(applyParallax);
-      }
-    };
-    window.addEventListener('scroll', requestParallax, { passive: true });
-    window.addEventListener('resize', requestParallax);
-    applyParallax();
-  }
-
-  /* ── Frontispiece: the note writes itself ───────── */
-  var fnLineEl = document.querySelector('.fn-line');
-  var fnTyped = document.getElementById('fn-typed');
-  var fnSrc = document.getElementById('fn-src');
-
-  if (fnLineEl && fnTyped) {
-    var fnText = fnLineEl.getAttribute('data-text') || '';
-    if (instant) {
-      fnTyped.textContent = fnText;
-      if (fnSrc) fnSrc.classList.add('on');
-    } else {
-      var fnPos = 0;
-      var typeNote = function () {
-        fnTyped.textContent = fnText.slice(0, fnPos);
-        if (fnPos < fnText.length) {
-          fnPos += 1;
-          setTimeout(typeNote, 38);
-        } else {
-          if (fnSrc) fnSrc.classList.add('on');
-          setTimeout(function () {
-            fnPos = 0;
-            if (fnSrc) fnSrc.classList.remove('on');
-            typeNote();
-          }, 4200);
-        }
-      };
-      /* Start after the slip has stamped in */
-      setTimeout(typeNote, 1700);
-    }
-  }
-
-  /* ── Specimen B: the quick writer typing ────────── */
-  var typed = document.getElementById('q-typed');
-  var qCursor = document.getElementById('q-cursor');
-  var draft = '# Study plan\nRead Alberti chapter two\n> Perspective is the rein and rudder of painting';
-
-  if (typed && !instant) {
-    var pos = 0;
-    (function tick() {
-      typed.textContent = draft.slice(0, pos);
-      if (pos < draft.length) {
-        pos += 1;
-        setTimeout(tick, 50);
-      } else {
-        setTimeout(function () { pos = 0; tick(); }, 2800);
-      }
-    })();
-  } else if (typed) {
-    typed.textContent = draft;
-    if (qCursor) qCursor.classList.remove('on');
-  }
-
-  // macOS: relabel the shortcut keys. Most just swap Ctrl -> Cmd; the few that
-  // differ (because their Cmd+Shift form clashes with a reserved macOS system
-  // shortcut) carry a data-mac attribute with the real sequence.
-  var isMac = /Mac/.test(navigator.platform) || /Mac/i.test(navigator.userAgent);
+  /* ── Mac key labels ─────────────────────────────── */
   if (isMac) {
-    document.querySelectorAll('kbd, .fn-key').forEach(function (el) {
+    document.querySelectorAll('kbd, .k-key, .tag-key').forEach(function (el) {
       var mac = el.getAttribute('data-mac');
       el.textContent = mac ? mac : el.textContent.replace(/Ctrl/g, 'Cmd');
     });
-    document.querySelectorAll('.kbd-mac-note').forEach(function (el) { el.hidden = false; });
+    var note = document.getElementById('mac-keynote');
+    if (note) note.hidden = false;
   }
 
+  /* ── Little helpers ─────────────────────────────── */
+  function stamp() {
+    var d = new Date();
+    var h = d.getHours();
+    var ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    var m = String(d.getMinutes()).padStart(2, '0');
+    return 'casrion.com · ' + h + ':' + m + ' ' + ampm;
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.hidden = true; }, 1900);
+  }
+
+  /* ── Marking the page ───────────────────────────── */
+  // Wrap every text node the range touches in its own <mark>, so a selection
+  // that crosses element boundaries does not have to be surgically rebuilt.
+  function wrapRange(range, id) {
+    var root = range.commonAncestorContainer;
+    var nodes = [];
+
+    if (root.nodeType === 3) {
+      nodes.push(root);
+    } else {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = walker.nextNode())) {
+        if (range.intersectsNode(n)) nodes.push(n);
+      }
+    }
+
+    // Read every offset before touching the DOM, because splitting text nodes
+    // moves the live range out from under us.
+    var plan = nodes.map(function (node) {
+      return {
+        node:  node,
+        start: node === range.startContainer ? range.startOffset : 0,
+        end:   node === range.endContainer   ? range.endOffset   : node.length
+      };
+    });
+
+    plan.forEach(function (p) {
+      if (p.end <= p.start) return;
+      if (!p.node.data.slice(p.start, p.end).trim()) return;
+      var target = p.node;
+      if (p.end < target.length) target.splitText(p.end);
+      if (p.start > 0) target = target.splitText(p.start);
+      var m = document.createElement('mark');
+      m.className = 'kept';
+      m.setAttribute('data-kept', id);
+      target.parentNode.insertBefore(m, target);
+      m.appendChild(target);
+    });
+  }
+
+  function unwrap(id) {
+    document.querySelectorAll('mark[data-kept="' + id + '"]').forEach(function (m) {
+      var parent = m.parentNode;
+      while (m.firstChild) parent.insertBefore(m.firstChild, m);
+      parent.removeChild(m);
+      parent.normalize();
+    });
+  }
+
+  /* ── The notebook ───────────────────────────────── */
+  var KINDS = {
+    note:   { cls: 'e-note',   md: function (t) { return [t]; } },
+    h1:     { cls: 'e-h1',     md: function (t) { return ['# ' + t]; } },
+    h2:     { cls: 'e-h2',     md: function (t) { return ['## ' + t]; } },
+    h3:     { cls: 'e-h3',     md: function (t) { return ['### ' + t]; } },
+    code:   { cls: 'e-code',   md: function (t) { return ['```', t, '```']; } },
+    bold:   { cls: 'e-bold',   md: function (t) { return ['**' + t + '**']; } },
+    italic: { cls: 'e-italic', md: function (t) { return ['*' + t + '*']; } }
+  };
+
+  function buildEntry(entry) {
+    var el = document.createElement(entry.kind === 'code' ? 'pre' : 'p');
+    el.className = 'e ' + KINDS[entry.kind].cls;
+    el.setAttribute('data-id', entry.id);
+
+    var body = document.createElement('span');
+    body.className = 'e-body';
+    body.textContent = entry.text;
+    el.appendChild(body);
+
+    var src = document.createElement('span');
+    src.className = 'e-src';
+    src.textContent = 'Source: ' + entry.src;
+    src.hidden = !srcBox.checked;
+    el.appendChild(src);
+
+    return el;
+  }
+
+  function refreshChrome() {
+    var n = entries.length;
+    countEl.textContent = n === 0 ? 'empty' : n + ' kept';
+    hintEl.hidden = n > 0;
+    saveBtn.disabled = n === 0;
+    clearBtn.disabled = n === 0;
+    if (drawerLbl) drawerLbl.textContent = n === 0 ? 'Casrion.md' : 'Casrion.md · ' + n;
+    drawerTab.classList.toggle('has', n > 0);
+  }
+
+  function addEntry(entry, opts) {
+    entries.push(entry);
+    var el = buildEntry(entry);
+    if (!reduced) el.classList.add('entry-in');
+    entriesEl.appendChild(el);
+    refreshChrome();
+    pageEl.scrollTop = pageEl.scrollHeight;
+    if (opts && opts.type) typeOut(el.querySelector('.e-body'), entry.text);
+    return el;
+  }
+
+  function typeOut(el, text) {
+    if (reduced) return;
+    el.textContent = '';
+    var i = 0;
+    (function tick() {
+      el.textContent = text.slice(0, i);
+      pageEl.scrollTop = pageEl.scrollHeight;
+      if (i < text.length) { i += 1; setTimeout(tick, 16); }
+    })();
+  }
+
+  function undoLast() {
+    if (!entries.length) return;
+    var gone = entries.pop();
+    unwrap(gone.id);
+    var el = entriesEl.querySelector('[data-id="' + gone.id + '"]');
+    if (el) el.remove();
+    refreshChrome();
+    toast('took the last one back');
+  }
+
+  function clearAll() {
+    entries.slice().forEach(function (e) { unwrap(e.id); });
+    entries = [];
+    entriesEl.textContent = '';
+    refreshChrome();
+  }
+
+  /* ── The flight from page to notebook ───────────── */
+  function fly(rect, text) {
+    if (reduced) return;
+    var target = (narrow() && !railEl.classList.contains('open'))
+      ? drawerTab.getBoundingClientRect()
+      : pageEl.getBoundingClientRect();
+
+    var el = document.createElement('div');
+    el.className = 'fly';
+    el.textContent = text;
+    el.style.left = rect.left + 'px';
+    el.style.top  = rect.top + 'px';
+    document.body.appendChild(el);
+
+    var dx = (target.left + Math.min(target.width, 160) / 2) - rect.left;
+    var dy = (target.top + 24) - rect.top;
+
+    requestAnimationFrame(function () {
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.62)';
+      el.style.opacity = '0';
+    });
+    setTimeout(function () { el.remove(); }, 460);
+  }
+
+  /* ── Capture ────────────────────────────────────── */
+  function capture(kind, range, text, opts) {
+    if (!KINDS[kind]) kind = 'note';
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+
+    var id = nextId++;
+    var rect = range.getBoundingClientRect();
+
+    wrapRange(range, id);
+    fly(rect, text);
+    addEntry({ id: id, kind: kind, text: text, src: stamp() }, opts);
+
+    if (narrow() && !railEl.classList.contains('open')) {
+      drawerTab.animate
+        ? drawerTab.animate(
+            [{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }],
+            { duration: 260, easing: 'ease-out' }
+          )
+        : null;
+    }
+
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    hideTag();
+  }
+
+  /* ── The floating tag ───────────────────────────── */
+  var liveRange = null;
+
+  function hideTag() {
+    tagEl.hidden = true;
+    liveRange = null;
+  }
+
+  function currentSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+    var range = sel.getRangeAt(0);
+    if (!reading.contains(range.commonAncestorContainer)) return null;
+    var text = sel.toString().replace(/\s+/g, ' ').trim();
+    if (text.length < 2) return null;
+    return { range: range, text: text };
+  }
+
+  function showTag() {
+    var hit = currentSelection();
+    if (!hit) { hideTag(); return; }
+    liveRange = hit.range.cloneRange();
+
+    var rects = hit.range.getClientRects();
+    var last = rects[rects.length - 1] || hit.range.getBoundingClientRect();
+
+    tagEl.hidden = false;
+    var tw = tagEl.offsetWidth;
+    var th = tagEl.offsetHeight;
+    var col = reading.getBoundingClientRect();
+    var edge = Math.min(col.right, document.documentElement.clientWidth - 10);
+
+    var left, top;
+    if (last.right + 10 + tw <= edge) {
+      // the selection ended short of the margin, so sit on that same line and
+      // cover nothing
+      left = last.right + 10;
+      top = last.top + (last.height - th) / 2;
+    } else {
+      // otherwise tuck under the last line, pinned inside the text column so it
+      // never wanders out over the notebook
+      left = Math.max(col.left, edge - tw);
+      top = last.bottom + 4;
+    }
+
+    tagEl.style.left = (left + window.scrollX) + 'px';
+    tagEl.style.top  = (top + window.scrollY) + 'px';
+  }
+
+  var selTimer;
+  document.addEventListener('selectionchange', function () {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(showTag, 90);
+  });
+
+  tagEl.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  tagEl.addEventListener('click', function () {
+    if (!liveRange) return;
+    capture('note', liveRange, liveRange.toString());
+  });
+
+  /* ── Real keys, for the ones the browser lets through ── */
+  var COMBO = {
+    KeyC: 'note', Digit1: 'h1', Digit2: 'h2', Digit3: 'h3',
+    KeyK: 'code', KeyB: 'bold', KeyI: 'italic', KeyZ: 'undo'
+  };
+
+  document.addEventListener('keydown', function (e) {
+    var mod = isMac ? e.metaKey : e.ctrlKey;
+    if (!mod || !e.shiftKey || e.altKey) return;
+    var kind = COMBO[e.code];
+    if (!kind) return;
+
+    if (kind === 'undo') {
+      if (!entries.length) return;
+      e.preventDefault();
+      undoLast();
+      flashRow('z');
+      return;
+    }
+
+    var hit = currentSelection();
+    if (!hit) return;
+    e.preventDefault();
+    flashRow(e.code === 'KeyC' ? 'c' : e.code.replace(/^(Key|Digit)/, '').toLowerCase());
+    capture(kind, hit.range, hit.text);
+  });
+
+  function flashRow(combo) {
+    var row = document.querySelector('.k-key[data-combo="' + combo + '"]');
+    if (!row) return;
+    var li = row.closest('li');
+    li.classList.add('hit');
+    setTimeout(function () { li.classList.remove('hit'); }, 320);
+  }
+
+  /* ── Notebook controls ──────────────────────────── */
+  srcBox.addEventListener('change', function () {
+    var on = srcBox.checked;
+    entriesEl.querySelectorAll('.e-src').forEach(function (s) { s.hidden = !on; });
+  });
+
+  clearBtn.addEventListener('click', function () {
+    clearAll();
+    toast('notebook emptied');
+  });
+
+  saveBtn.addEventListener('click', function () {
+    if (!entries.length) return;
+    var lines = ['# Kept from casrion.com', ''];
+    entries.forEach(function (e) {
+      lines = lines.concat(KINDS[e.kind].md(e.text));
+      if (srcBox.checked) lines.push('', '*Source: ' + e.src + '*');
+      lines.push('');
+    });
+    var blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Casrion.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast('saved Casrion.md');
+  });
+
+  /* ── Mobile drawer ──────────────────────────────── */
+  function syncDrawer() {
+    if (narrow()) {
+      drawerTab.hidden = railEl.classList.contains('open');
+    } else {
+      drawerTab.hidden = true;
+      railEl.classList.remove('open');
+    }
+  }
+  drawerTab.addEventListener('click', function () {
+    railEl.classList.add('open');
+    syncDrawer();
+  });
+  document.addEventListener('click', function (e) {
+    if (!narrow() || !railEl.classList.contains('open')) return;
+    if (railEl.contains(e.target) || drawerTab.contains(e.target)) return;
+    railEl.classList.remove('open');
+    syncDrawer();
+  });
+  window.addEventListener('resize', syncDrawer);
+  syncDrawer();
+
+  /* ── The demo beat ──────────────────────────────────
+     One marked sentence keeps itself the first time you scroll to it, so the
+     mechanic explains itself without a tooltip telling you to try something. */
+  var seed = document.querySelector('[data-auto]');
+  if (seed && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (rows) {
+      rows.forEach(function (row) {
+        if (!row.isIntersecting || demoDone || entries.length) return;
+        demoDone = true;
+        io.disconnect();
+        setTimeout(function () {
+          if (entries.length) return;
+          var r = document.createRange();
+          r.selectNodeContents(seed);
+          capture('note', r, seed.textContent, { type: true });
+          hintEl.textContent = 'Your turn. Select anything on the left, then click the tag that shows up.';
+          hintEl.hidden = false;
+          setTimeout(function () { hintEl.hidden = entries.length > 0; }, 5200);
+        }, 850);
+      });
+    }, { threshold: 0.9 });
+    io.observe(seed);
+  }
+
+  refreshChrome();
 })();
