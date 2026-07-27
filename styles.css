@@ -33,6 +33,7 @@ body {
   line-height: 1.62;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  hanging-punctuation: first last;
 }
 
 /* the faint tooth of the paper */
@@ -90,12 +91,13 @@ kbd {
 
 /* ═══ The writing ═════════════════════════════════ */
 h1 {
-  font-size: clamp(2rem, 4.4vw, 2.7rem);
-  line-height: 1.14;
+  font-size: clamp(2.05rem, 4.6vw, 2.85rem);
+  line-height: 1.08;
   font-weight: 600;
-  letter-spacing: -0.015em;
-  margin-bottom: 1.7rem;
-  max-width: 20ch;
+  letter-spacing: -0.022em;
+  margin-bottom: 1.35rem;
+  max-width: 17ch;
+  text-wrap: balance;
 }
 
 h2 {
@@ -125,19 +127,15 @@ p { margin-bottom: 1.1rem; }
 .reading > p + p.grab,
 .reading > p + p.footnote { text-indent: 0; margin-top: 0; }
 
-.opening::first-letter {
-  float: left;
-  font-size: 3.15rem;
-  line-height: 0.84;
-  padding: 0.1rem 0.5rem 0 0;
-  color: var(--stamp);
-  font-weight: 600;
+.lede {
+  font-size: 1.16rem;
+  line-height: 1.52;
+  margin-bottom: 1rem;
 }
 
-.try { color: var(--ink); }
-.try::after {
-  content: " \2190"; color: var(--stamp);
-}
+.try { color: var(--ink-soft); font-size: 0.97rem; }
+.try::after { content: " \2192"; color: var(--stamp); }
+@media (max-width: 63rem) { .try::after { content: " \2193"; } }
 
 .aside {
   font-size: 0.88rem; line-height: 1.6; color: var(--ink-soft);
@@ -168,12 +166,17 @@ mark.kept {
     rgba(156, 74, 31, 0.28) 96.5%,
     rgba(156, 74, 31, 0)    99%
   );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   border-radius: 4px;
   padding: 0.08em 0.22em;
   margin: 0 -0.16em;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+/* the stroke draws itself, the way a marker actually lands on a page */
+mark.kept.drawing { animation: sweep 0.44s cubic-bezier(0.3, 0.05, 0.2, 1) both; }
+@keyframes sweep { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
 /* overlapping captures must not stack into a dark blob */
 mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 
@@ -195,12 +198,26 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
   white-space: nowrap;
 }
 .k-mine {
-  font-size: 0.72rem; color: var(--ink-faint);
+  font-size: 0.72rem; color: var(--stamp); opacity: 0.75;
   text-align: right; white-space: nowrap;
 }
-.keylist li[data-live] .k-mine { color: var(--stamp); opacity: 0.75; }
 /* flash when its real key fires */
 .keylist li.hit { background: rgba(156, 74, 31, 0.09); }
+
+/* the ones that only exist in the app, kept to one dense block */
+.app-keys {
+  list-style: none;
+  display: flex; flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.88rem; color: var(--ink-soft);
+}
+.app-keys li { display: inline-flex; align-items: baseline; gap: 0.4rem; }
+.app-keys b {
+  font-family: var(--mono); font-weight: 400;
+  font-size: 0.72rem; color: var(--ink-faint);
+  white-space: nowrap;
+}
 
 /* ═══ Spec ════════════════════════════════════════ */
 .spec { width: 100%; border-collapse: collapse; margin: 1.6rem 0 1.2rem; font-size: 0.95rem; }
@@ -243,6 +260,7 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 }
 .setup p { font-size: 0.94rem; color: var(--ink-soft); margin-bottom: 0.4rem; }
 .setup p:last-child { margin-bottom: 0; }
+.more { display: block; margin-top: 0.3rem; font-size: 0.92em; color: var(--ink-faint); }
 .code-line code {
   display: inline-block;
   font-size: 0.8rem;
@@ -277,9 +295,11 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 
 .book {
   display: flex; flex-direction: column;
-  height: calc(100vh - 3.2rem);
-  max-height: 44rem;
-  min-height: 22rem;
+  /* starts modest and grows as you fill it, rather than looming empty */
+  height: auto;
+  min-height: 15rem;
+  max-height: min(44rem, calc(100vh - 3.2rem));
+  transition: min-height 0.3s ease;
   background: var(--paper-card);
   border: 1px solid var(--rule);
   box-shadow: 3px 4px 0 rgba(36, 29, 21, 0.13);
@@ -297,12 +317,21 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 .book-count { color: var(--ink-faint); font-size: 0.68rem; }
 
 .book-page {
-  flex: 1; min-height: 0;
+  /* basis auto, not 0, so the book can size itself to what is in it */
+  flex: 1 1 auto; min-height: 0;
   overflow-y: auto;
   padding: 0.9rem 0.9rem 1.2rem 2rem;
   /* the margin rule of a notebook */
   background-image: linear-gradient(to right, transparent 0 1.55rem, rgba(156, 74, 31, 0.22) 1.55rem 1.6rem, transparent 1.6rem);
   scrollbar-width: thin;
+}
+/* until something is in it, it should read as blank ruled paper waiting */
+.book-page.is-empty {
+  background-image:
+    linear-gradient(to right, transparent 0 1.55rem, rgba(156, 74, 31, 0.22) 1.55rem 1.6rem, transparent 1.6rem),
+    repeating-linear-gradient(to bottom,
+      transparent 0 1.62rem,
+      rgba(196, 178, 152, 0.55) 1.62rem calc(1.62rem + 1px));
 }
 
 .book-hint {
@@ -355,9 +384,11 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 /* an author display rule outranks the UA sheet's [hidden], so say it here */
 .e-src[hidden] { display: none; }
 
-.entry-in { animation: land 0.34s cubic-bezier(0.2, 1.1, 0.35, 1) both; }
+/* lands like a slip of paper dropped in, not like a div appearing */
+.entry-in { animation: land 0.4s cubic-bezier(0.2, 1.1, 0.35, 1) both; }
 @keyframes land {
-  from { opacity: 0; transform: translateY(7px); }
+  from { opacity: 0; transform: translateY(10px) rotate(-0.8deg); }
+  60%  { opacity: 1; transform: translateY(0) rotate(0.25deg); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -465,6 +496,7 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
   .rail.open { transform: none; pointer-events: auto; }
   .book {
     height: min(62vh, 30rem);
+    min-height: 0;
     max-height: none;
     box-shadow: 0 -4px 22px rgba(36, 29, 21, 0.2);
   }

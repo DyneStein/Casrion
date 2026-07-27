@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Casrion</title>
-  <meta name="description" content="Casrion turns anything you copy into a finished Markdown note, on one keypress, without pulling you out of what you were reading. Offline, free, no account.">
+  <meta name="description" content="Casrion turns anything you copy into a finished Markdown note on one keypress, without pulling you out of what you were reading. Offline, free, no account.">
   <link rel="icon" type="image/png" href="./favicon-32.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -23,127 +23,81 @@
       <a class="top-get" href="#get">Download</a>
     </header>
 
-    <h1>A notes app that does the writing-down part for you.</h1>
+    <h1>Notes, minus the part where you stop to take them.</h1>
 
-    <p class="opening">
-      Here is the thing I could never fix about taking notes. The moment worth
-      keeping and the moment you have time to write it down are never the same
-      moment. You are four paragraphs into something good, you hit a line you
-      want, and the only way to keep it is to leave. Open the app. Find the
-      right file. Paste. Fix the formatting it dragged in. Type out where it
-      came from. By then you have lost the thread you were pulling, and after
-      two or three of those you quietly stop keeping anything at all.
+    <p class="lede">
+      The moment worth keeping and the moment you have time to write it down are
+      never the same one. So Casrion puts the whole detour on a single key.
+      <span data-auto>You copy the line, you press it, you keep reading.</span>
     </p>
 
-    <p>
-      <span data-auto>So Casrion puts that entire detour on one key. You copy the line, you
-      press the key, you keep reading.</span> The note is already written by the
-      time you look up from the page.
-    </p>
-
-    <p class="try">
-      Which is easier to show than explain, so this page does it too. Select any
-      sentence here. A little tag will show up next to it. Click the tag.
-    </p>
+    <p class="try">Like that. Select any sentence here and click the tag.</p>
 
     <p class="aside">
-      One honest note: in the app the key is <kbd>Ctrl+Shift+C</kbd>, but your
-      browser has already claimed that one for its developer tools and will not
-      give it back, so on this page you click the tag instead. The headings and
-      undo below do work on the real keys.
+      In the app that key is <kbd>Ctrl+Shift+C</kbd>. Your browser keeps that one
+      for its dev tools and will not hand it over, so on this page you click
+      instead. The headings and undo below are real.
     </p>
 
-    <h2 id="shape">It writes it down properly, not just quickly</h2>
+    <h2 id="shape">The key decides the shape</h2>
 
     <p>
-      A capture that lands as a wall of unformatted text is barely better than
-      the clipboard. So the key you press decides the shape it arrives in. Grab
-      a definition as a heading, a snippet as a fenced code block, the one line
-      that actually mattered in bold. It is plain Markdown on the other side,
-      in a file you chose, on a disk you own.
-    </p>
-
-    <p>
-      Try that here as well. Select something above, then press one of these
-      instead of clicking the tag.
+      A capture that lands as a wall of text is barely better than the clipboard.
+      So the key you press picks how it arrives: heading, code, bold, plain. It
+      comes out as Markdown, in a file you chose, on a disk you own.
     </p>
 
     <ul class="keylist" id="keylist">
-      <li data-live><span class="k-what">Keep it as it is</span><b class="k-key" data-combo="c">Ctrl+Shift+C</b><span class="k-mine">click the tag</span></li>
-      <li data-live><span class="k-what">Keep it as a heading</span><b class="k-key" data-combo="1" data-mac="Cmd+Shift+1">Ctrl+Shift+1</b><span class="k-mine">works here</span></li>
-      <li data-live><span class="k-what">Smaller heading</span><b class="k-key" data-combo="2" data-mac="Cmd+Shift+2">Ctrl+Shift+2</b><span class="k-mine">works here</span></li>
-      <li data-live><span class="k-what">Smaller still</span><b class="k-key" data-combo="3" data-mac="Cmd+Ctrl+3">Ctrl+Shift+3</b><span class="k-mine">works here</span></li>
-      <li data-live><span class="k-what">Keep it as code</span><b class="k-key" data-combo="k">Ctrl+Shift+K</b><span class="k-mine">works here</span></li>
-      <li data-live><span class="k-what">Keep it bold</span><b class="k-key" data-combo="b">Ctrl+Shift+B</b><span class="k-mine">browser took it</span></li>
-      <li data-live><span class="k-what">Keep it italic</span><b class="k-key" data-combo="i">Ctrl+Shift+I</b><span class="k-mine">browser took it</span></li>
-      <li data-live><span class="k-what">Undo the last one</span><b class="k-key" data-combo="z">Ctrl+Shift+Z</b><span class="k-mine">works here</span></li>
-      <li><span class="k-what">Keep a screenshot</span><b class="k-key">Ctrl+Shift+V</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Record a voice memo</span><b class="k-key">Ctrl+Shift+M</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Open the quick writer</span><b class="k-key" data-mac="Cmd+Shift+J">Ctrl+Shift+Q</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Explain what you selected</span><b class="k-key" data-mac="Cmd+Shift+E">Ctrl+Shift+E</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Start a new paragraph</span><b class="k-key">Ctrl+Shift+N</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Keep it in red, green, blue</span><b class="k-key" data-mac="Cmd+Ctrl+R / G / B">Alt+R / G / B</b><span class="k-mine">in the app</span></li>
-      <li><span class="k-what">Show every shortcut</span><b class="k-key">Ctrl+Shift+H</b><span class="k-mine">in the app</span></li>
+      <li><span class="k-what">Keep it as it is</span><b class="k-key" data-combo="c">Ctrl+Shift+C</b><span class="k-mine">click the tag</span></li>
+      <li><span class="k-what">Keep it as a heading</span><b class="k-key" data-combo="1" data-mac="Cmd+Shift+1">Ctrl+Shift+1</b><span class="k-mine">try it</span></li>
+      <li><span class="k-what">Smaller heading</span><b class="k-key" data-combo="2" data-mac="Cmd+Shift+2">Ctrl+Shift+2</b><span class="k-mine">try it</span></li>
+      <li><span class="k-what">Keep it as code</span><b class="k-key" data-combo="k">Ctrl+Shift+K</b><span class="k-mine">try it</span></li>
+      <li><span class="k-what">Undo the last one</span><b class="k-key" data-combo="z">Ctrl+Shift+Z</b><span class="k-mine">try it</span></li>
     </ul>
 
+    <ul class="app-keys">
+      <li>Screenshot <b>Ctrl+Shift+V</b></li>
+      <li>Voice memo <b>Ctrl+Shift+M</b></li>
+      <li>Quick writer <b data-mac="Cmd+Shift+J">Ctrl+Shift+Q</b></li>
+      <li>Explain <b data-mac="Cmd+Shift+E">Ctrl+Shift+E</b></li>
+      <li>New paragraph <b>Ctrl+Shift+N</b></li>
+      <li>Colour <b data-mac="Cmd+Ctrl+R / G / B">Alt+R / G / B</b></li>
+      <li>All of them <b>Ctrl+Shift+H</b></li>
+    </ul>
     <p class="footnote" id="mac-keynote" hidden>
-      You are on a Mac, so the keys above are showing their Mac versions. A few
-      of them are not a straight Ctrl to Cmd swap, because macOS keeps some of
-      those combinations for itself.
+      Showing Mac keys. A few are not a straight Ctrl to Cmd swap, because macOS
+      keeps those combinations for itself.
     </p>
 
     <h2 id="source">It remembers where you got it</h2>
 
     <p>
-      A quote with no source is half a note. You will read it back in November
-      and have no idea whether you agreed with it or were arguing with it. So
-      every capture can carry a small stamp: the page it came from, the app it
-      was in, the time you took it. Look at the notebook next to this text and
-      you will see the stamps piling up under everything you kept.
+      A quote with no source is half a note. Every capture can carry the page it
+      came from, the app, and the time. They are stacking up in the notebook
+      right now. Untick the box and watch them go.
+    </p>
+
+    <h2 id="explain">And it explains what you don't know</h2>
+
+    <p>
+      Sometimes the problem is not keeping the sentence, it is that the sentence
+      means nothing to you yet. Select it, tap <kbd>Ctrl</kbd> twice, and a small
+      window explains it where you are standing. It reads the window around your
+      selection, so it knows a stray symbol belongs to the formula three lines up.
     </p>
 
     <p>
-      It is one toggle, and it is off if you want it off. There is a checkbox
-      on the notebook. Turn it off and watch the stamps go.
+      That is a language model on your own disk, so nothing is sent anywhere. It
+      stays unloaded until you look like you need it and hands the memory back
+      five minutes after you stop. Idle, the whole app sits under 450 MB.
     </p>
 
-    <h2 id="explain">When you have no idea what you are looking at</h2>
+    <h2 id="quick">Thoughts that started in your head</h2>
 
     <p>
-      Sometimes the problem is not keeping the sentence, it is that the
-      sentence means nothing to you yet. Select it, tap <kbd>Ctrl</kbd> twice,
-      and a small window explains it where you are standing, in whatever app
-      you are standing in. It reads the window around your selection too, so it
-      knows a stray symbol is part of the formula three lines up.
-    </p>
-
-    <p>
-      That runs on a language model living on your own disk. Nothing is sent
-      anywhere. It is a one time download of about a gigabyte, and it stays out
-      of your way until you ask: it does not load at launch, it loads the first
-      time you look like you are about to need it, and it hands the memory back
-      about five minutes after you stop. Idle, the whole app sits under
-      <span class="num">450 MB</span>.
-    </p>
-
-    <h2 id="quick">When the thought is your own</h2>
-
-    <p>
-      Not everything worth keeping is something you copied. For the ones that
-      start in your own head, a small writer floats over whatever you are doing,
-      takes the thought, and vanishes. Markdown works while you type it. If you
-      get interrupted halfway, and you will, the draft is still sitting there
-      when you come back.
-    </p>
-
-    <h2 id="voice">Or say it out loud</h2>
-
-    <p>
-      Some thoughts come out faster than you can type them, and the typing kills
-      them on the way. Hold the key, say it, let go. The recording tucks itself
-      into the note next to everything else, and it is a normal audio file in a
-      normal folder, so it will still play in ten years when this app is long
-      gone.
+      Not everything is copied. A small writer floats over whatever you are doing,
+      takes the thought, and vanishes, with Markdown working as you type. Or hold
+      a key and just say it, for the thoughts that typing would kill.
     </p>
 
     <!-- Screenshot slot. When there is a real one, drop it in here:
@@ -156,32 +110,21 @@
     <h2 id="private">Nothing leaves your machine</h2>
 
     <p>
-      This is not a privacy policy, it is an architecture. Casrion makes no
-      network requests. Not fewer than most, none. There is no account to make,
-      no sync server it is quietly reaching, no analytics counting your
-      keypresses. Your notes are Markdown files in folders you picked, and if
-      you delete the app tomorrow every one of them is still readable in
+      Casrion makes no network requests. Not fewer than most, none. Delete it
+      tomorrow and every note you made is still sitting there, readable in
       Notepad.
     </p>
 
     <table class="spec">
-      <tr><th>Version</th><td>1.0.0</td></tr>
       <tr><th>Runs on</th><td>Windows 10 and 11, macOS 11+ on Apple Silicon</td></tr>
       <tr><th>Install size</th><td>about 100 MB</td></tr>
       <tr><th>Idle memory</th><td>about 450 MB</td></tr>
-      <tr><th>Your notes</th><td>plain Markdown, in folders you choose</td></tr>
-      <tr><th>Network requests</th><td>none</td></tr>
-      <tr><th>Account</th><td>none</td></tr>
-      <tr><th>Telemetry</th><td>none</td></tr>
+      <tr><th>Your notes</th><td>plain Markdown, in folders you pick</td></tr>
+      <tr><th>Network, account, telemetry</th><td>none, none, none</td></tr>
       <tr><th>Price</th><td>free</td></tr>
     </table>
 
     <h2 id="get">Go get it</h2>
-
-    <p>
-      No email, no sign up, no newsletter waiting on the other side of the
-      button. It is one click and then it is yours.
-    </p>
 
     <p class="grab">
       <a class="btn" href="/get">Download for Windows</a>
@@ -189,156 +132,86 @@
     </p>
 
     <p class="footnote">
-      The Windows installer is unsigned, because the certificate costs more than
-      this app makes, so SmartScreen will put up a blue box the first time.
-      Click <b>More info</b>, then <b>Run anyway</b>. Once, and never again.
-      The Mac build needs a few permissions, which are all below.
+      No email, no sign up. The installer is unsigned because the certificate
+      costs more than this app makes, so SmartScreen shows a blue box the first
+      time: <b>More info</b>, then <b>Run anyway</b>. Once, never again.
     </p>
 
-    <h2 id="mac">Mac needs about two minutes of setup</h2>
+    <h2 id="mac">Mac wants two minutes first</h2>
 
     <p>
-      Apple wants money for a signature too, so macOS treats Casrion as a
-      stranger the first time. Here is the whole thing, in order, and then it is
-      done forever.
+      Apple charges for a signature too, so macOS treats Casrion as a stranger
+      once. Then it is done forever.
     </p>
 
     <ol class="setup">
       <li>
-        <h3>Install it</h3>
-        <p>Open the <code>.dmg</code> and drag Casrion into <b>Applications</b>.</p>
+        <h3>Drag it into Applications</h3>
+        <p>Straight out of the <code>.dmg</code>.</p>
       </li>
       <li>
-        <h3>Open it the first time</h3>
+        <h3>Right click it, choose Open</h3>
         <p>
-          Because it is not from the App Store, the first launch gets blocked.
-          In <b>Applications</b>, <b>right click</b> Casrion and choose
-          <b>Open</b>, then <b>Open</b> again in the dialog. If it still refuses
-          and says it cannot be opened, paste this into <b>Terminal</b> once and
-          then open it normally:
-        </p>
-        <p class="code-line"><code>xattr -cr /Applications/Casrion.app</code></p>
-      </li>
-      <li>
-        <h3>Allow Accessibility, for Explain</h3>
-        <p>
-          Explain has to read the text you highlighted. Go to <b>System Settings
-          &rarr; Privacy &amp; Security &rarr; Accessibility</b> and switch
-          <b>Casrion</b> on. Casrion opens that pane for you the first time you
-          try to explain something.
+          Then <b>Open</b> again in the dialog. That gets you past the first
+          launch block.
+          <span class="more">Still refusing? Run <code>xattr -cr /Applications/Casrion.app</code> in Terminal once, then open it normally.</span>
         </p>
       </li>
       <li>
-        <h3>Allow Input Monitoring, for the double tap</h3>
+        <h3>Switch on Accessibility</h3>
         <p>
-          macOS guards raw key taps separately from everything else, so if you
-          want the double tap of <b>Cmd</b> to work, switch <b>Casrion</b> on
-          under <b>Input Monitoring</b> as well. Do not want to? Skip it.
-          <kbd>Cmd+Shift+E</kbd> only needs the step above.
+          <b>System Settings &rarr; Privacy &amp; Security &rarr; Accessibility</b>.
+          Explain needs it to read what you highlighted. Casrion opens that pane
+          for you the first time you ask it to explain something.
         </p>
       </li>
       <li>
-        <h3>Allow the microphone, for voice memos</h3>
-        <p>macOS asks the first time you record. Click <b>Allow</b>.</p>
-      </li>
-      <li>
-        <h3>Say yes to the browser question, for source stamps</h3>
+        <h3>Switch on Input Monitoring, if you want the double tap</h3>
         <p>
-          The first capture out of Safari or Chrome makes macOS ask whether
-          Casrion can control the browser. That question is how your notes get
-          stamped with the exact page. Say no and captures still note which app
-          they came from, just without the address.
+          macOS guards raw key taps separately. Skip this and
+          <kbd>Cmd+Shift+E</kbd> still works fine.
         </p>
       </li>
       <li>
         <h3>Quit and reopen once</h3>
         <p>
-          macOS only applies those switches to a fresh launch. Quit Casrion
-          properly from the menu bar icon and open it again. Setup only, never
-          again.
+          From the menu bar icon, so macOS actually applies the switches. The
+          microphone and browser questions just appear when you first need them,
+          click <b>Allow</b>.
         </p>
       </li>
     </ol>
 
-    <h2 id="questions">Questions people actually ask</h2>
+    <h2 id="questions">Fair questions</h2>
 
     <dl class="qa">
-      <dt>Windows says it protected my PC. Is that bad?</dt>
-      <dd>
-        No. That is SmartScreen, and it appears for any installer without an
-        expensive code signing certificate. It does not mean something was
-        found. <b>More info</b>, then <b>Run anyway</b>.
-      </dd>
+      <dt>Windows says it protected my PC.</dt>
+      <dd>SmartScreen, for any installer without an expensive certificate. Nothing was found. <b>More info</b>, then <b>Run anyway</b>.</dd>
 
-      <dt>Where do my notes actually live?</dt>
-      <dd>
-        In Markdown files, in folders you pick. Screenshots and voice memos sit
-        in an assets folder right beside each note. Move them, back them up, put
-        them in Dropbox, open them in something else. They are just files.
-      </dd>
+      <dt>Where do my notes live?</dt>
+      <dd>Markdown files in folders you pick, with screenshots and voice memos in an assets folder beside them. They are just files.</dd>
 
       <dt>Does it need internet?</dt>
-      <dd>
-        Never. The one exception is the optional Explain model, which is a
-        single download the first time you turn it on, and after that even that
-        works on a plane.
-      </dd>
-
-      <dt>How much memory does it use?</dt>
-      <dd>
-        Around 450 MB sitting idle. If you use Explain it climbs while the model
-        is loaded and drops back about five minutes after you stop asking
-        things.
-      </dd>
+      <dd>Never. Explain downloads its model once if you turn it on, and after that even that works on a plane.</dd>
 
       <dt>How do I quit it, or update it?</dt>
-      <dd>
-        Closing the window leaves it capturing from the tray, which is the
-        point. To really quit, right click the tray icon and choose Quit. To
-        update, download the newer installer and run it over the old one. Your
-        notes are never touched.
-      </dd>
-
-      <dt>Do I need an account?</dt>
-      <dd>No. There is nothing to sign up for. There is no server to sign up to.</dd>
+      <dd>Closing the window leaves it capturing from the tray, which is the point. Right click the tray icon to really quit. To update, run the new installer over the old one. Your notes are untouched.</dd>
 
       <dt>My Mac says Casrion cannot be opened.</dt>
-      <dd>
-        That is macOS being careful about an unsigned app, not a problem with
-        the app. Right click it in Applications and choose <b>Open</b>, then
-        <b>Open</b> again. If it still refuses, run
-        <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.
-        Full walkthrough is <a href="#mac">up in the Mac setup</a>.
-      </dd>
-
-      <dt>Which Macs?</dt>
-      <dd>Apple Silicon, M1 and newer, on macOS 11 or later. Intel Macs are not supported yet.</dd>
+      <dd>Right click it in Applications and choose <b>Open</b>, then <b>Open</b> again. If it still refuses, <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.</dd>
 
       <dt>I updated on Mac and a permission stopped working.</dt>
-      <dd>
-        macOS ties permissions to the exact copy of the app, so replacing
-        Casrion with a new version can quietly invalidate the checkmarks while
-        they still look switched on. In <b>Privacy &amp; Security</b>, open
-        <b>Accessibility</b> and <b>Input Monitoring</b>, remove Casrion with
-        <b>&minus;</b>, add it back with <b>+</b>, then quit and reopen.
-      </dd>
-
-      <dt>The download did not start.</dt>
-      <dd>
-        Press the button again, it always points at the current version. If your
-        browser is being strange, right click and choose <b>Save link as</b>.
-        Still stuck, mail me at <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
-      </dd>
+      <dd>macOS ties them to the exact copy, so the checkmarks can go stale while still looking on. Remove Casrion from <b>Accessibility</b> and <b>Input Monitoring</b> with <b>&minus;</b>, add it back with <b>+</b>, quit and reopen.</dd>
     </dl>
 
     <footer class="colophon">
       <p>
-        Casrion is free, it is one person's app, and it will stay offline. If
-        you read source code for fun the whole thing is
-        <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>,
-        and a star genuinely makes my day.
+        One person's app, free, and staying offline. The source is
+        <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>
+        if you read that sort of thing for fun. Stuck on something?
+        <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
       </p>
-      <p class="sign">Built in a lot of evenings. Go keep something.</p>
+      <p class="sign">Go keep something.</p>
     </footer>
 
   </main>
@@ -351,11 +224,9 @@
         <span class="book-count" id="count">empty</span>
       </div>
 
-      <div class="book-page" id="page">
+      <div class="book-page is-empty" id="page">
         <div class="entries" id="entries"></div>
-        <p class="book-hint" id="hint">
-          Nothing kept yet. Select a sentence on the left and a tag will show up.
-        </p>
+        <p class="book-hint" id="hint">Nothing kept yet.</p>
       </div>
 
       <div class="book-foot">

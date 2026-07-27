@@ -28,7 +28,7 @@
 
   /* ── Mac key labels ─────────────────────────────── */
   if (isMac) {
-    document.querySelectorAll('kbd, .k-key, .tag-key').forEach(function (el) {
+    document.querySelectorAll('kbd, .k-key, .tag-key, .app-keys b').forEach(function (el) {
       var mac = el.getAttribute('data-mac');
       el.textContent = mac ? mac : el.textContent.replace(/Ctrl/g, 'Cmd');
     });
@@ -81,6 +81,7 @@
       };
     });
 
+    var marks = [];
     plan.forEach(function (p) {
       if (p.end <= p.start) return;
       if (!p.node.data.slice(p.start, p.end).trim()) return;
@@ -92,7 +93,17 @@
       m.setAttribute('data-kept', id);
       target.parentNode.insertBefore(m, target);
       m.appendChild(target);
+      marks.push(m);
     });
+
+    // let the stroke draw itself, then drop the class so undo and reflow are
+    // dealing with a plain mark again
+    if (!reduced && marks.length) {
+      marks.forEach(function (m) { m.classList.add('drawing'); });
+      setTimeout(function () {
+        marks.forEach(function (m) { m.classList.remove('drawing'); });
+      }, 560);
+    }
   }
 
   function unwrap(id) {
@@ -138,6 +149,7 @@
     var n = entries.length;
     countEl.textContent = n === 0 ? 'empty' : n + ' kept';
     hintEl.hidden = n > 0;
+    pageEl.classList.toggle('is-empty', n === 0);
     saveBtn.disabled = n === 0;
     clearBtn.disabled = n === 0;
     if (drawerLbl) drawerLbl.textContent = n === 0 ? 'Casrion.md' : 'Casrion.md · ' + n;
@@ -393,15 +405,31 @@
         if (!row.isIntersecting || demoDone || entries.length) return;
         demoDone = true;
         io.disconnect();
-        setTimeout(function () {
+        var run = function () {
           if (entries.length) return;
           var r = document.createRange();
           r.selectNodeContents(seed);
           capture('note', r, seed.textContent, { type: true });
-          hintEl.textContent = 'Your turn. Select anything on the left, then click the tag that shows up.';
+          hintEl.textContent = 'Your turn. Select anything and click the tag.';
           hintEl.hidden = false;
-          setTimeout(function () { hintEl.hidden = entries.length > 0; }, 5200);
-        }, 850);
+          setTimeout(function () { hintEl.hidden = entries.length > 0; }, 5000);
+          // on a phone the notebook is a drawer, so let it peek while the note
+          // lands and then get out of the way again
+          if (narrow()) setTimeout(function () {
+            railEl.classList.remove('open');
+            syncDrawer();
+          }, 3400);
+        };
+
+        setTimeout(function () {
+          if (narrow()) {
+            railEl.classList.add('open');
+            syncDrawer();
+            setTimeout(run, 340);
+          } else {
+            run();
+          }
+        }, 900);
       });
     }, { threshold: 0.9 });
     io.observe(seed);
