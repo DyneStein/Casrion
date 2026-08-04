@@ -51,6 +51,10 @@
   --paper-link: #8a5a2b;
   --block-hover-bg: rgba(36, 29, 21, 0.03);
   --block-hover-border: rgba(36, 29, 21, 0.14);
+
+  /* Lucide's chevron-right, used as a mask so it takes its colour from the
+     element and needs no dark-mode variant. */
+  --caret-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
 }
 
 .dark-mode {
@@ -699,7 +703,7 @@ body.platform-mac .header {
 .document-body table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1.5rem 0;
+  margin: 1rem 0;
   color: var(--paper-text);
 }
 .document-body th, .document-body td {
@@ -719,6 +723,14 @@ body.platform-mac .header {
 .wysiwyg-editor {
   outline: none;
   min-height: calc(100vh - 180px);
+}
+/* Edit mode has no blank-line blocks between paragraphs, so the paragraphs
+   themselves carry that space here. Same rhythm as the reading view, which is
+   what stops a note from shifting under you when you switch between them.
+   Double the reading view's gap, because these margins collapse into each
+   other where the reading view's block padding keeps them apart. */
+.wysiwyg-editor.doc-block-content p {
+  margin: 0.06rem 0;
 }
 
 /* Protected atoms: source stamps and voice memos shown as single
@@ -816,7 +828,7 @@ body.platform-mac .header {
 /* ─── Document Blocks ─────────────────────────────────────── */
 .doc-block {
   position: relative;
-  padding: 0.25rem 0.75rem;
+  padding: 0.03rem 0.75rem;
   margin: 0 -0.75rem;
   border-left: 3px solid transparent;
   border-radius: 0;
@@ -834,9 +846,67 @@ body.platform-mac .header {
   border-left-color: var(--accent) !important;
 }
 
+/* A blank line between two paragraphs is a real, clickable block here, so its
+   height used to be the whole gap you saw between consecutive lines. It now
+   takes no space at all: two lines you typed sit as close as two lines of one
+   wrapped sentence. Nothing about where the insertion point can go changed,
+   only what it costs to look at. */
 .doc-block-blank {
-  min-height: 1rem;
-  padding: 0.1rem 0.75rem;
+  min-height: 0;
+  padding: 0 0.75rem;
+  /* Without this the block after it paints over the strip's lower half and
+     only the top half of the gap is clickable. */
+  z-index: 1;
+}
+
+/* Every blank line collapses, however many are stacked up. Runs of three and
+   four are not a deliberate gap in this app, they are just what capturing plus
+   Ctrl+Shift+N leaves behind, and giving those a height put a full empty row
+   back into the middle of a note. */
+
+/* Having no height of its own, the block would be impossible to point at. This
+   invisible strip reaches into the blocks on either side and gives it one. */
+.doc-block-blank::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -0.3rem;
+  bottom: -0.3rem;
+}
+
+/* And this is how you can see it: the same chevron an active block shows, out
+   in the margin, on hover. Nothing between the lines themselves, so the page
+   stays quiet until you go looking for somewhere to put something. */
+.doc-block-blank::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translateY(-50%);
+  background-color: var(--accent);
+  -webkit-mask-image: var(--caret-mask);
+  mask-image: var(--caret-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.doc-block-blank:hover::before { opacity: 0.6; }
+
+/* The insertion point keeps the chevron on, and pulses it like the other
+   active blocks do, instead of drawing a rule across the page. */
+.doc-block-blank.doc-block-active { background: none !important; }
+.doc-block-blank.doc-block-active::before {
+  opacity: 1;
+  animation: indicatorPulse 1.8s ease-in-out infinite;
 }
 
 /* Active block indicator arrow */
@@ -857,7 +927,9 @@ body.platform-mac .header {
 /* ─── Typography (theme-aware paper) ──────────────────────── */
 .doc-block-content h1 {
   font-size: 1.95rem;
-  margin: 0.8rem 0 0.5rem;
+  /* Blank lines no longer pad these out, so the heading's own margin carries
+     the section break. Bigger number, much less space than before. */
+  margin: 1.1rem 0 0.45rem;
   color: var(--paper-heading);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -868,7 +940,7 @@ body.platform-mac .header {
 
 .doc-block-content h2 {
   font-size: 1.4rem;
-  margin: 0.5rem 0 0.35rem;
+  margin: 0.9rem 0 0.35rem;
   color: var(--paper-h2);
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -877,17 +949,20 @@ body.platform-mac .header {
 
 .doc-block-content h3 {
   font-size: 1.15rem;
-  margin: 0.4rem 0 0.25rem;
+  margin: 0.7rem 0 0.25rem;
   color: var(--paper-h3);
   font-weight: 600;
   line-height: 1.4;
 }
 
 .doc-block-content p {
-  margin: 0.35rem 0;
+  /* No margin at all: consecutive lines you typed should read as consecutive
+     lines, the way they do in a plain text editor. What little separation a
+     paragraph gets comes from the block padding and the blank line between. */
+  margin: 0;
   color: var(--paper-text);
   font-size: 0.95rem;
-  line-height: 1.75;
+  line-height: 1.4;
 }
 
 .doc-block-content strong { color: var(--paper-strong); font-weight: 600; }
@@ -906,7 +981,7 @@ body.platform-mac .header {
   max-width: 100%;
   border-radius: 2px;
   box-shadow: 2px 3px 0 var(--overlay-shadow);
-  margin: 0.5rem 0;
+  margin: 0.4rem 0;
   border: 1px solid var(--paper-code-border);
 }
 
@@ -916,7 +991,7 @@ body.platform-mac .header {
   width: 100%;
   max-width: 420px;
   height: 44px;
-  margin: 0.5rem 0;
+  margin: 0.4rem 0;
   border-radius: 22px;
   border: 1px solid var(--paper-code-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -925,14 +1000,14 @@ body.platform-mac .header {
 
 /* Lists */
 .doc-block-content ul, .doc-block-content ol {
-  margin: 0.35rem 0;
+  margin: 0.25rem 0;
   padding-left: 1.5rem;
   color: var(--paper-text);
 }
 .doc-block-content li {
   font-size: 0.95rem;
-  margin-bottom: 0.15rem;
-  line-height: 1.65;
+  margin-bottom: 0.05rem;
+  line-height: 1.4;
 }
 .doc-block-content li::marker { color: var(--paper-muted); }
 
@@ -965,7 +1040,7 @@ body.platform-mac .header {
   border: 1px solid #3a322b;
   border-radius: 3px;
   padding: 1rem 1.25rem;
-  margin: 0.6rem 0;
+  margin: 0.5rem 0;
   overflow-x: auto;
 }
 .doc-block-content pre code {
@@ -989,6 +1064,17 @@ body.platform-mac .header {
   border-radius: 2px;
   padding: 0.6rem 0.8rem;
   margin: 0.35rem 0;
+}
+
+/* ─── Whiteboard ──────────────────────────────────────────── */
+/* In a note a board is only an <img> of an SVG, so it costs no more to have
+   one sitting there than a screenshot does. */
+.doc-block-content img.board-img {
+  cursor: pointer;
+  border-color: var(--accent-border-soft);
+}
+.doc-block-content img.board-img:hover {
+  border-color: var(--accent);
 }
 
 /* Horizontal rule */
