@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Casrion Whiteboard</title>
+<style>
+  :root {
+    --plate: #fbfaf8;
+    --shell: #241f1b;
+    --shell-line: rgba(255, 255, 255, 0.12);
+    --label: #b9ada2;
+    --label-dim: #7d7167;
+    --accent: #d4a373;
+    --mono: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--mono);
+    user-select: none;
+    background: transparent;
+  }
+
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--shell);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  /* The bar doubles as the window's drag handle, so the board can be moved
+     off whatever it is covering. */
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 6px 8px;
+    background: var(--shell);
+    border-bottom: 1px solid var(--shell-line);
+    -webkit-app-region: drag;
+    flex: 0 0 auto;
+  }
+  .group { display: flex; align-items: center; gap: 4px; -webkit-app-region: no-drag; }
+  .sep { width: 1px; height: 17px; margin: 0 3px; background: var(--shell-line); }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 6px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--label);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: color 0.14s, border-color 0.14s, background 0.14s;
+  }
+  button:hover:not(:disabled) { color: var(--accent); border-color: rgba(212, 163, 115, 0.4); }
+  button.on { color: var(--accent); border-color: rgba(212, 163, 115, 0.4); background: rgba(212, 163, 115, 0.12); }
+  button:disabled { opacity: 0.3; cursor: default; }
+  button svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .go { color: var(--accent); border-color: rgba(212, 163, 115, 0.4); }
+  .go:hover:not(:disabled) { background: rgba(212, 163, 115, 0.2); }
+
+  .ink {
+    width: 18px; height: 18px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.14s;
+  }
+  .ink:hover { transform: scale(1.14); }
+  .ink.on { border-color: #f2ece4; }
+
+  .nib span { display: block; border-radius: 50%; background: currentColor; }
+
+  .stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: #1b1714;
+  }
+
+  /* The canvas carries its own 1600x900 intrinsic size, so auto width and
+     height with both maxes gives exact contain behaviour at any window size,
+     with no aspect-ratio maths to get wrong. */
+  #plate {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    background: var(--plate);
+    border-radius: 3px;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+    touch-action: none;
+    cursor: crosshair;
+  }
+  #plate.erasing { cursor: cell; }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 5px 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--label-dim);
+    border-top: 1px solid var(--shell-line);
+    flex: 0 0 auto;
+  }
+  .err { color: #e08b6a; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="bar">
+    <div class="group">
+      <button id="t-pen" class="on" title="Marker">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button id="t-eraser" title="Eraser. Drag across a stroke to remove it">
+        <svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4L15 3a1 1 0 0 1 1.4 0L21 7.6a1 1 0 0 1 0 1.4L12 18"/><path d="M22 21H7"/></svg>
+      </button>
+      <span class="sep"></span>
+      <span id="inks" class="group"></span>
+      <span class="sep"></span>
+      <span id="nibs" class="group"></span>
+    </div>
+
+    <div class="group">
+      <button id="undo" title="Undo. Ctrl+Z">
+        <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button id="redo" title="Redo. Ctrl+Y">
+        <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+      </button>
+      <button id="wipe" title="Wipe the board">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+      <span class="sep"></span>
+      <button id="cancel" title="Close without saving. Esc">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <button id="save" class="go" title="Save into the note">
+        <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <span id="save-label">Add to note</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="stage"><canvas id="plate" width="1600" height="900"></canvas></div>
+
+  <div class="foot">
+    <span id="count">Empty board</span>
+    <span id="hint">Ctrl+Z undo, Ctrl+Y redo, Esc to close</span>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+const W = 1600, H = 900;
+// Baked into the saved file, because an SVG inside an <img> cannot read the
+// app's theme. A whiteboard is white in every note.
+const PLATE = '#fbfaf8';
+
+const COLORS = [
+  { name: 'Black',  hex: '#22201e' },
+  { name: 'Blue',   hex: '#2563a8' },
+  { name: 'Red',    hex: '#c8402f' },
+  { name: 'Green',  hex: '#2f7d4f' },
+  { name: 'Orange', hex: '#cc7a29' },
+  { name: 'Purple', hex: '#6b4fa0' }
+];
+const SIZES = [{ name: 'Fine', w: 3 }, { name: 'Marker', w: 7 }, { name: 'Broad', w: 14 }];
+
+const r1 = (n) => Math.round(n * 10) / 10;
+
+/* Catmull-Rom through every point, emitted as cubics. The on-curve endpoint of
+   each cubic IS an original input point, which is what lets a saved board be
+   read back into editable strokes with nothing stored on the side. */
+function toPath(pts) {
+  if (!pts.length) return '';
+  const p = pts.length === 1 ? [pts[0], pts[0]] : pts;
+  let d = 'M' + r1(p[0].x) + ' ' + r1(p[0].y);
+  for (let i = 0; i < p.length - 1; i++) {
+    const prev = p[i - 1] || p[i], cur = p[i], next = p[i + 1], after = p[i + 2] || next;
+    d += 'C' + r1(cur.x + (next.x - prev.x) / 6) + ' ' + r1(cur.y + (next.y - prev.y) / 6)
+       + ' ' + r1(next.x - (after.x - cur.x) / 6) + ' ' + r1(next.y - (after.y - cur.y) / 6)
+       + ' ' + r1(next.x) + ' ' + r1(next.y);
+  }
+  return d;
+}
+
+function fromPath(d) {
+  const pts = [];
+  for (const part of String(d || '').trim().split(/(?=[MC])/)) {
+    const n = part.slice(1).trim().split(/[\s,]+/).map(Number).filter((v) => !Number.isNaN(v));
+    if (part[0] === 'M' && n.length >= 2) pts.push({ x: n[0], y: n[1] });
+    else if (part[0] === 'C' && n.length >= 6) pts.push({ x: n[4], y: n[5] });
+  }
+  return pts;
+}
+
+function toSvg(strokes) {
+  const body = strokes.map((s) =>
+    '<path d="' + toPath(s.points) + '" stroke="' + s.color + '" stroke-width="' + s.width + '"/>'
+  ).join('\n');
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">\n'
+    + '<rect width="' + W + '" height="' + H + '" fill="' + PLATE + '"/>\n'
+    + '<g fill="none" stroke-linecap="round" stroke-linejoin="round">\n' + body + '\n</g>\n</svg>';
+}
+
+function fromSvg(text) {
+  try {
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    if (doc.querySelector('parsererror')) return null;
+    return [...doc.querySelectorAll('path')].map((el) => ({
+      color: el.getAttribute('stroke') || COLORS[0].hex,
+      width: parseFloat(el.getAttribute('stroke-width')) || SIZES[1].w,
+      points: fromPath(el.getAttribute('d'))
+    })).filter((s) => s.points.length);
+  } catch { return null; }
+}
+
+function distToSeg(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, len = dx * dx + dy * dy;
+  let t = len ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+// ── state ────────────────────────────────────────────────────────────────
+const plate = document.getElementById('plate');
+const ctx = plate.getContext('2d');
+const baked = document.createElement('canvas');
+baked.width = W; baked.height = H;
+const bctx = baked.getContext('2d');
+
+let strokes = [], redoStack = [], live = null;
+let color = COLORS[0].hex, width = SIZES[1].w, erasing = false;
+let relPath = null, dirty = false, saving = false;
+
+const $ = (id) => document.getElementById(id);
+
+function paint(c, s) {
+  c.strokeStyle = s.color;
+  c.lineWidth = s.width;
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  c.stroke(new Path2D(toPath(s.points)));
+}
+
+// Committed strokes live on their own canvas, so a busy board does not repaint
+// every stroke on every pointer move.
+function rebake() {
+  bctx.fillStyle = PLATE;
+  bctx.fillRect(0, 0, W, H);
+  for (const s of strokes) paint(bctx, s);
+}
+
+// A pointer can fire several moves per displayed frame, and each repaint blits
+// the whole plate. Coalesce them onto the frame instead.
+let frameQueued = false;
+function draw() {
+  frameQueued = false;
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(baked, 0, 0);
+  if (live) paint(ctx, live);
+}
+function present() {
+  if (frameQueued) return;
+  frameQueued = true;
+  requestAnimationFrame(draw);
+}
+
+function status(msg, isError) {
+  $('hint').textContent = msg || 'Ctrl+Z undo, Ctrl+Y redo, Esc to close';
+  $('hint').className = isError ? 'err' : '';
+}
+
+function refresh() {
+  $('count').textContent = strokes.length === 0
+    ? 'Empty board'
+    : strokes.length + ' stroke' + (strokes.length === 1 ? '' : 's');
+  $('undo').disabled = !strokes.length;
+  $('redo').disabled = !redoStack.length;
+  $('wipe').disabled = !strokes.length;
+  $('save-label').textContent = saving ? 'Saving' : relPath ? 'Save' : 'Add to note';
+}
+
+// ── toolbar ──────────────────────────────────────────────────────────────
+COLORS.forEach((c) => {
+  const b = document.createElement('button');
+  b.className = 'ink' + (c.hex === color ? ' on' : '');
+  b.style.background = c.hex;
+  b.title = c.name;
+  b.onclick = () => { color = c.hex; setTool(false); paintToolbar(); };
+  $('inks').appendChild(b);
+});
+
+SIZES.forEach((s) => {
+  const b = document.createElement('button');
+  b.className = 'nib' + (s.w === width ? ' on' : '');
+  b.title = s.name;
+  const dot = document.createElement('span');
+  dot.style.width = dot.style.height = Math.max(3, Math.round(s.w / 1.7)) + 'px';
+  b.appendChild(dot);
+  b.onclick = () => { width = s.w; setTool(false); paintToolbar(); };
+  $('nibs').appendChild(b);
+});
+
+function paintToolbar() {
+  [...$('inks').children].forEach((b, i) => b.classList.toggle('on', COLORS[i].hex === color && !erasing));
+  [...$('nibs').children].forEach((b, i) => b.classList.toggle('on', SIZES[i].w === width));
+  $('t-pen').classList.toggle('on', !erasing);
+  $('t-eraser').classList.toggle('on', erasing);
+}
+
+function setTool(toEraser) { erasing = toEraser; plate.classList.toggle('erasing', erasing); paintToolbar(); }
+$('t-pen').onclick = () => setTool(false);
+$('t-eraser').onclick = () => setTool(true);
+
+// ── drawing ──────────────────────────────────────────────────────────────
+function toBoard(e) {
+  const r = plate.getBoundingClientRect();
+  return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+}
+
+function eraseAt(p) {
+  const reach = Math.max(14, width * 1.5);
+  const kept = strokes.filter((s) => {
+    for (let i = 0; i < s.points.length; i++) {
+      const a = s.points[i], b = s.points[i + 1] || a;
+      if (distToSeg(p, a, b) <= reach + s.width / 2) return false;
+    }
+    return true;
+  });
+  if (kept.length !== strokes.length) {
+    strokes = kept; redoStack = []; dirty = true;
+    rebake(); present(); refresh();
+  }
+}
+
+plate.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  plate.setPointerCapture(e.pointerId);
+  const p = toBoard(e);
+  if (erasing) { eraseAt(p); return; }
+  live = { color, width, points: [p] };
+  present();
+});
+
+plate.addEventListener('pointermove', (e) => {
+  const p = toBoard(e);
+  if (erasing) { if (e.buttons & 1) eraseAt(p); return; }
+  if (!live) return;
+  const last = live.points[live.points.length - 1];
+  // Skip points the pen barely moved: fewer, better-spaced points give the
+  // curve something smooth to follow instead of tracing sensor jitter.
+  if (Math.hypot(p.x - last.x, p.y - last.y) < 2.5) return;
+  live.points.push(p);
+  present();
+});
+
+function endStroke() {
+  if (!live) return;
+  strokes.push(live);
+  redoStack = [];
+  dirty = true;
+  paint(bctx, live);   // only the new stroke needs baking
+  live = null;
+  present(); refresh();
+}
+plate.addEventListener('pointerup', endStroke);
+plate.addEventListener('pointercancel', endStroke);
+
+// ── actions ──────────────────────────────────────────────────────────────
+function undo() {
+  if (!strokes.length) return;
+  redoStack.push(strokes.pop());
+  dirty = true;
+  rebake(); present(); refresh();
+}
+function redo() {
+  if (!redoStack.length) return;
+  const back = redoStack.pop();
+  strokes.push(back);
+  dirty = true;
+  paint(bctx, back); present(); refresh();
+}
+function wipe() {
+  if (!strokes.length) return;
+  if (!confirm('Wipe the whole board?')) return;
+  strokes = []; redoStack = []; dirty = true;
+  rebake(); present(); refresh();
+}
+function close() {
+  if (dirty && !confirm('Close the board and lose this drawing?')) return;
+  ipcRenderer.invoke('close-board');
+}
+async function save() {
+  if (saving) return;
+  saving = true; refresh(); status('');
+  const result = await ipcRenderer.invoke('save-board', { svg: toSvg(strokes), relPath });
+  saving = false; refresh();
+  if (result && result.error) { status(result.error, true); return; }
+  dirty = false;
+  ipcRenderer.invoke('close-board');
+}
+
+$('undo').onclick = undo;
+$('redo').onclick = redo;
+$('wipe').onclick = wipe;
+$('cancel').onclick = close;
+$('save').onclick = save;
+
+/* Plain Ctrl+Z / Ctrl+Y on purpose: Ctrl+Shift+Z and Ctrl+Shift+Y are global
+   shortcuts for the note's own undo and fire even while this window has focus,
+   so the board must not try to use them. */
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+  if (!e.ctrlKey && !e.metaKey) return;
+  if (e.shiftKey || e.altKey) return;
+  if (e.code === 'KeyZ') { e.preventDefault(); undo(); }
+  else if (e.code === 'KeyY') { e.preventDefault(); redo(); }
+});
+
+// ── opened by the main process ───────────────────────────────────────────
+ipcRenderer.on('board-open', (_e, payload) => {
+  relPath = (payload && payload.relPath) || null;
+  strokes = []; redoStack = []; live = null; dirty = false; saving = false;
+  let problem = '';
+  if (payload && payload.missing) {
+    // The file the note points at is gone (moved, deleted, folder unplugged).
+    problem = 'That board file is missing, so it opened blank. Saving writes a new one.';
+  } else if (payload && payload.svg) {
+    const parsed = fromSvg(payload.svg);
+    if (parsed) strokes = parsed;
+    else problem = 'That board could not be read, so it opened blank. Saving replaces it.';
+  }
+  setTool(false);
+  rebake(); present(); refresh();
+  status(problem, !!problem);
+});
+
+rebake(); present(); refresh();
+</script>
+</body>
+</html>

@@ -85,6 +85,7 @@ function HelpPanel({ onClose }) {
             <h2>Images, voice and more</h2>
             <Shortcut keys={keysFor('Ctrl+Shift+V')} action="Insert the image or screenshot on your clipboard" />
             <Shortcut keys={keysFor('Ctrl+Shift+M')} action="Start or stop a voice memo" />
+            <Shortcut keys={keysFor('Ctrl+Shift+D')} action="Open a whiteboard and draw" />
             <Shortcut keys={keysFor('Ctrl+Shift+N')} action="Start a new paragraph" />
             <Shortcut keys={keysFor('Ctrl+Shift+Z')} action="Undo the last capture" />
             <Shortcut keys={keysFor('Ctrl+Shift+Y')} action="Redo what you just undid" />
@@ -92,6 +93,12 @@ function HelpPanel({ onClose }) {
             <p>
               To capture a screenshot: press {IS_MAC ? 'Cmd+Shift+4' : 'Win+Shift+S'}, snip the area you want, then press
               {' '}{MOD}+Shift+V. The image is saved next to your note and appears inside it.
+            </p>
+            <p>
+              A whiteboard is saved beside your note as an ordinary .svg drawing, so it
+              opens in any browser and stays readable without this app. Double-click a
+              board in your note to pick the marker back up. Inside the board, {MOD}+Z
+              undoes a stroke and {MOD}+Y puts it back.
             </p>
           </section>
 

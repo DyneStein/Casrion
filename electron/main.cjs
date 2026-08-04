@@ -24,6 +24,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow;
+let boardWindow;
 let overlayWindow;
 let helpOverlayWindow;
 let quickInputWindow;
@@ -681,6 +682,125 @@ function createQuickInputWindow() {
       quickInputWindow.hide();
     }
   });
+}
+
+/**
+ * The whiteboard floats over whatever you were doing, like the quick note
+ * popup, rather than dragging the main window forward. It is created on first
+ * use, not at launch, so a user who never draws never pays for the renderer.
+ *
+ * No blur-to-dismiss here, unlike the other overlays: losing an unsaved
+ * drawing because you clicked the wrong thing would be unforgivable.
+ */
+function createBoardWindow() {
+  boardWindow = new BrowserWindow({
+    width: 1000,
+    height: 660,
+    frame: false,
+    // Opaque on purpose, unlike the pill-shaped overlays: a transparent window
+    // gives up compositing shortcuts, and this one repaints a full canvas on
+    // every pointer move. Smooth strokes beat rounded corners.
+    backgroundColor: '#241f1b',
+    transparent: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      backgroundThrottling: false
+    }
+  });
+  boardWindow.setAlwaysOnTop(true, 'screen-saver');
+  floatOverEverything(boardWindow);
+  boardWindow.loadFile(path.join(__dirname, 'board.html'));
+
+  // Clicking away must not dismiss it (that would bin an unsaved drawing), but
+  // it must not sit on top of everything either, with no taskbar entry to dig
+  // it back out of. So it stops floating while you are elsewhere and floats
+  // again the moment you come back to it.
+  boardWindow.on('blur', () => {
+    if (boardWindow && !boardWindow.isDestroyed()) boardWindow.setAlwaysOnTop(false);
+  });
+  boardWindow.on('focus', () => {
+    if (boardWindow && !boardWindow.isDestroyed()) boardWindow.setAlwaysOnTop(true, 'screen-saver');
+  });
+}
+
+// Fit the plate to whichever monitor the user is on, keeping 16:9 for the
+// drawing area and leaving room for the toolbar and footer.
+function showBoardWindow(payload) {
+  const { screen } = require('electron');
+  const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const CHROME = 96;  // toolbar + footer + the stage's padding
+  let w = Math.min(1200, Math.round(wa.width * 0.86));
+  let h = Math.round((w - 24) * 9 / 16) + CHROME;
+  const maxH = Math.round(wa.height * 0.9);
+  if (h > maxH) {
+    h = maxH;
+    w = Math.round((h - CHROME) * 16 / 9) + 24;
+  }
+  boardWindow.setBounds({
+    x: Math.round(wa.x + (wa.width - w) / 2),
+    y: Math.round(wa.y + (wa.height - h) / 2),
+    width: w,
+    height: h
+  });
+  boardWindow.webContents.send('board-open', payload);
+  boardWindow.show();
+  boardWindow.focus();
+}
+
+let boardOpening = false;
+// The note the open board belongs to. Saving checks this, so a board can never
+// land in a different note than the one it was started from.
+let boardNotePath = null;
+
+async function openBoard(relPath) {
+  if (boardOpening) return;
+
+  // Opening on top of a board that is already up would silently throw away
+  // whatever is drawn on it. Bring it forward instead.
+  if (boardWindow && !boardWindow.isDestroyed() && boardWindow.isVisible()) {
+    boardWindow.show();
+    boardWindow.focus();
+    showOverlayNotification('The board is already open', 'error');
+    return;
+  }
+
+  boardOpening = true;
+  try {
+    if (!boardWindow || boardWindow.isDestroyed()) {
+      createBoardWindow();
+      await new Promise((resolve) => boardWindow.webContents.once('did-finish-load', resolve));
+    }
+
+    // Editing an existing board: hand it the file so it can pick the strokes
+    // back up. A board that will not read still opens, blank and saying so,
+    // rather than leaving the user with a dead shortcut.
+    let svg = null;
+    let missing = false;
+    if (relPath && activeFilePath) {
+      const noteDir = path.dirname(activeFilePath);
+      const target = path.normalize(path.join(noteDir, relPath));
+      const rel = path.relative(path.join(noteDir, 'assets'), target);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        console.warn('[Casrion] Refused to open a board outside the note assets:', relPath);
+        return;
+      }
+      try {
+        svg = fs.readFileSync(target, 'utf8');
+      } catch (e) {
+        missing = true;
+        console.warn('[Casrion] Could not read board:', relPath, e.message);
+      }
+    }
+
+    boardNotePath = activeFilePath;
+    showBoardWindow({ relPath: relPath || null, svg, missing });
+  } finally {
+    boardOpening = false;
+  }
 }
 
 function showQuickInputPopup() {
@@ -1665,6 +1785,13 @@ function registerShortcuts() {
       const s = beginSourceStamp();
       enqueueCapture(() => captureImage(s, pre));
     },
+    'CommandOrControl+Shift+D': () => {                                  // Whiteboard
+      if (!activeFilePath) {
+        showOverlayNotification('Open a note first, then draw', 'error');
+        return;
+      }
+      openBoard(null);
+    },
     'CommandOrControl+Shift+N': () => {                                  // New paragraph
       if (activeFilePath) showOverlayNotification('New Line Started', 'paragraph');
       enqueueCapture(() => newParagraph());
@@ -1722,6 +1849,76 @@ function registerIPC() {
   ipcMain.handle('get-initial-state', () => buildStatePayload());
 
   // The renderer has a live recorder: the "Recording..." toast is now honest.
+  // A whiteboard is written as a plain .svg into the same assets folder the
+  // screenshots use, and referenced from the note as an ordinary markdown
+  // image. That is deliberate: images already survive the editor's markdown
+  // round trip and the relative-path migration above, so a board needs no
+  // special handling anywhere else in the app.
+  ipcMain.handle('save-board', (_event, { svg, relPath } = {}) => {
+    try {
+      if (!activeFilePath) return { error: 'Open a note first' };
+      if (typeof svg !== 'string' || !svg.startsWith('<svg')) return { error: 'That board did not come out as an SVG' };
+      // The note was switched underneath the board. Saving now would write the
+      // drawing into the wrong note, so say so and keep it on screen instead.
+      if (boardNotePath && boardNotePath !== activeFilePath) {
+        return { error: `This board belongs to ${path.basename(boardNotePath)}. Open that note again to save it.` };
+      }
+
+      const noteDir = path.dirname(activeFilePath);
+      const assetsDir = path.join(noteDir, 'assets');
+      if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+
+      // Editing an existing board overwrites it in place, so the note keeps
+      // pointing at the same file and nothing has to be re-inserted.
+      if (relPath) {
+        const target = path.normalize(path.join(noteDir, relPath));
+        const rel = path.relative(assetsDir, target);
+        // Never let a path from the renderer escape this note's assets folder.
+        if (rel.startsWith('..') || path.isAbsolute(rel) || !/^board-\d+\.svg$/i.test(path.basename(target))) {
+          return { error: 'That board path is not one of ours' };
+        }
+        fs.writeFileSync(target, svg, 'utf8');
+        console.log('[Casrion] Board updated:', path.basename(target));
+        // The note's text is unchanged, so nothing would re-render the image.
+        // Tell the window to pull the new file in.
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('board-saved', { relPath });
+        }
+        return { ok: true, relPath };
+      }
+
+      // Numbered separately from screenshots, whose numbering only ever scans
+      // .png files — so the two can never collide.
+      let maxNum = 0;
+      for (const file of fs.readdirSync(assetsDir)) {
+        const m = /^board-(\d+)\.svg$/i.exec(file);
+        if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+      }
+      const filename = `board-${maxNum + 1}.svg`;
+      fs.writeFileSync(path.join(assetsDir, filename), svg, 'utf8');
+
+      pushUndo();
+      // A drawing is the user's own work, never the front window's.
+      ensureStampBoundary();
+      insertionLine = insertNewLineAfter(`![Board](assets/${filename})`, insertionLine);
+      console.log('[Casrion] Board added:', filename, 'at line', insertionLine);
+      notifyRendererFileUpdated();
+      return { ok: true, relPath: `assets/${filename}` };
+    } catch (e) {
+      console.error('[Casrion] Board save failed:', e);
+      return { error: 'Could not save the board. Check the note folder is still available' };
+    }
+  });
+
+  // Hiding rather than closing keeps the window warm for the next drawing,
+  // and hands focus back to whatever the user was working in.
+  ipcMain.handle('close-board', () => {
+    if (boardWindow && !boardWindow.isDestroyed()) boardWindow.hide();
+  });
+
+  // Double-clicking a board in the note asks for it by its relative path.
+  ipcMain.handle('open-board', (_event, relPath) => openBoard(relPath || null));
+
   ipcMain.handle('recording-started', () => {
     recordingConfirmed = true;
     clearTimeout(recordingStartTimer);
@@ -1827,9 +2024,11 @@ function registerIPC() {
         try {
           const filePath = path.join(path.dirname(activeFilePath), uri);
           if (fs.existsSync(filePath)) {
-            const ext = path.extname(filePath).toLowerCase().substring(1) || 'png';
+            // Derive the real media type rather than pasting the extension in:
+            // a whiteboard is image/svg+xml, and "image/svg" renders as nothing.
+            const mime = ASSET_MIME[path.extname(filePath).toLowerCase()] || 'image/png';
             const base64 = fs.readFileSync(filePath).toString('base64');
-            return `![${alt}](data:image/${ext};base64,${base64})`;
+            return `![${alt}](data:${mime};base64,${base64})`;
           }
         } catch (e) {
           console.error('[Casrion] Failed to inline image', uri, e);
@@ -1848,9 +2047,11 @@ function registerIPC() {
             audioFile = decodeURI(uri.substring(8));
           }
           if (audioFile && fs.existsSync(audioFile)) {
-            const ext = path.extname(audioFile).toLowerCase().substring(1) || 'webm';
+            // Same reason as the images above: an .m4a is audio/mp4, and the
+            // extension pasted in raw ("audio/m4a") is not a media type.
+            const mime = ASSET_MIME[path.extname(audioFile).toLowerCase()] || 'audio/webm';
             const base64 = fs.readFileSync(audioFile).toString('base64');
-            return `<audio controls src="data:audio/${ext};base64,${base64}"></audio>`;
+            return `<audio controls src="data:${mime};base64,${base64}"></audio>`;
           }
         } catch (e) {
           console.error('[Casrion] Failed to inline audio', uri, e);

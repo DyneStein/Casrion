@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAudio: (buffer, mimeType, durationMs) => ipcRenderer.invoke('save-audio', buffer, mimeType, durationMs),
   recordingFailed: (message) => ipcRenderer.invoke('recording-failed', message),
 
+  // Whiteboard (an .svg in the note's assets folder, drawn in its own window)
+  openBoard: (relPath) => ipcRenderer.invoke('open-board', relPath),
+  onBoardSaved: (callback) => subscribe('board-saved', callback),
+
   // Editor & Export
   saveFileContent: (content) => ipcRenderer.invoke('save-file-content', { content }),
   exportDocument: (options) => ipcRenderer.invoke('export-document', options),

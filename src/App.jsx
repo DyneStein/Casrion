@@ -185,6 +185,15 @@ function App() {
     };
   }, []);
 
+  // Saving over an existing board leaves the note's text untouched, so the
+  // image has to be told to re-fetch itself.
+  useEffect(() => {
+    const unsub = window.electronAPI?.onBoardSaved?.((data) => {
+      window.dispatchEvent(new CustomEvent('casrion-board-saved', { detail: data }));
+    });
+    return () => unsub?.();
+  }, []);
+
   const handleAddFolder = async () => {
     if (!window.electronAPI) return;
     await flushPendingSave();

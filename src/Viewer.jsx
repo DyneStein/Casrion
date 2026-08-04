@@ -42,8 +42,13 @@ const retryDelay = (attempt) => 350 * Math.pow(2, attempt - 1); // 350ms → 5.6
  * stable keys across updates, a broken <img> would otherwise stay broken
  * until the app restarts. On error we reload with a cache-busting query.
  */
+// Whiteboards are saved as board-N.svg in the note's assets folder, so they
+// arrive here as ordinary markdown images and only need recognising.
+const BOARD_RE = /\/assets\/board-\d+\.svg$/i;
+
 function AssetImage({ node: _node, src, ...props }) {
   const [attempt, setAttempt] = useState(0);
+  const [reload, setReload] = useState(0);
   const attemptRef = useRef(0);
   const timerRef = useRef(null);
 
@@ -55,7 +60,23 @@ function AssetImage({ node: _node, src, ...props }) {
   }, [src]);
 
   const isLocal = typeof src === 'string' && src.startsWith('casrion://');
-  const url = isLocal && attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+  const isBoard = isLocal && BOARD_RE.test(src.split('?')[0]);
+  const url = isLocal && (attempt > 0 || reload > 0)
+    ? `${src}${src.includes('?') ? '&' : '?'}v=${attempt}.${reload}`
+    : src;
+
+  // Saving over a board leaves the note's text identical, so nothing would
+  // re-render it. Bump the URL to pull the new file in.
+  useEffect(() => {
+    if (!isBoard) return;
+    const clean = src.split('?')[0];
+    const onSaved = (e) => {
+      const rel = String(e.detail?.relPath || '').replace(/\\/g, '/');
+      if (rel && clean.endsWith('/' + rel)) setReload((n) => n + 1);
+    };
+    window.addEventListener('casrion-board-saved', onSaved);
+    return () => window.removeEventListener('casrion-board-saved', onSaved);
+  }, [isBoard, src]);
 
   const handleError = () => {
     if (!isLocal || attemptRef.current >= ASSET_RETRIES) return;
@@ -65,9 +86,30 @@ function AssetImage({ node: _node, src, ...props }) {
     timerRef.current = setTimeout(() => setAttempt(next), retryDelay(next));
   };
 
+  // The board is drawn in its own floating window, so this only has to say
+  // which file to pick back up.
+  const openBoard = () => {
+    const clean = src.split('?')[0];
+    const at = clean.lastIndexOf('/assets/');
+    if (at === -1) return;
+    window.electronAPI?.openBoard?.(decodeURIComponent(clean.slice(at + 1)));
+  };
+
   // lazy + async: a long note full of screenshots only decodes what is on
   // screen, which keeps scrolling smooth and memory flat on weaker machines.
-  return <img {...props} src={url} onError={handleError} alt={props.alt ?? ''} loading="lazy" decoding="async" />;
+  return (
+    <img
+      {...props}
+      src={url}
+      onError={handleError}
+      alt={props.alt ?? ''}
+      loading="lazy"
+      decoding="async"
+      className={isBoard ? 'board-img' : undefined}
+      title={isBoard ? 'Whiteboard. Double-click to draw on it again' : props.title}
+      onDoubleClick={isBoard ? openBoard : undefined}
+    />
+  );
 }
 
 /**
