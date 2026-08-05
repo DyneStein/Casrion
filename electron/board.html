@@ -247,11 +247,38 @@ function distToSeg(p, a, b) {
 }
 
 // ── state ────────────────────────────────────────────────────────────────
+const MOD = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
+const HINT = MOD + '+Z undo, ' + MOD + '+Y redo, Esc to close';
+
 const plate = document.getElementById('plate');
 const ctx = plate.getContext('2d');
 const baked = document.createElement('canvas');
-baked.width = W; baked.height = H;
 const bctx = baked.getContext('2d');
+
+/* A canvas fixed at 1600x900 is stretched over a Retina screen's 2x pixels,
+   which turns a crisp marker line soft. Give both canvases the real device
+   pixels and scale the drawing transform to match, so every bit of code above
+   still works in plain board coordinates and never has to think about it. */
+let dpr = 0;
+function sizeCanvases() {
+  dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  for (const [el, c] of [[plate, ctx], [baked, bctx]]) {
+    el.width = Math.round(W * dpr);
+    el.height = Math.round(H * dpr);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+sizeCanvases();
+
+// Dragging the window from a Retina screen onto an ordinary one (or back)
+// changes the ratio under us. Re-cut the canvases and repaint from the strokes.
+window.addEventListener('resize', () => {
+  const want = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  if (want === dpr) return;
+  sizeCanvases();
+  rebake();
+  present();
+});
 
 let strokes = [], redoStack = [], live = null;
 let color = COLORS[0].hex, width = SIZES[1].w, erasing = false;
@@ -281,7 +308,9 @@ let frameQueued = false;
 function draw() {
   frameQueued = false;
   ctx.clearRect(0, 0, W, H);
-  ctx.drawImage(baked, 0, 0);
+  // Sized explicitly: the baked canvas is in device pixels, this one draws in
+  // board coordinates, so it has to be told which of the two this is.
+  ctx.drawImage(baked, 0, 0, W, H);
   if (live) paint(ctx, live);
 }
 function present() {
@@ -291,9 +320,14 @@ function present() {
 }
 
 function status(msg, isError) {
-  $('hint').textContent = msg || 'Ctrl+Z undo, Ctrl+Y redo, Esc to close';
+  $('hint').textContent = msg || HINT;
   $('hint').className = isError ? 'err' : '';
 }
+
+// Every key this window names, said the way the platform says it.
+$('hint').textContent = HINT;
+$('undo').title = 'Undo. ' + MOD + '+Z';
+$('redo').title = 'Redo. ' + MOD + '+Y';
 
 function refresh() {
   $('count').textContent = strokes.length === 0
@@ -431,16 +465,24 @@ $('wipe').onclick = wipe;
 $('cancel').onclick = close;
 $('save').onclick = save;
 
-/* Plain Ctrl+Z / Ctrl+Y on purpose: Ctrl+Shift+Z and Ctrl+Shift+Y are global
-   shortcuts for the note's own undo and fire even while this window has focus,
-   so the board must not try to use them. */
+/* Ctrl/Cmd+Z and +Y land here directly. Their Shift variants are registered as
+   global shortcuts for the note's own undo, so they never reach this window at
+   all; the main process spots that the board has focus and sends them back as
+   the two events below. That is what makes Cmd+Shift+Z, which is redo
+   everywhere else on a Mac, redo a stroke here rather than edit the note. */
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { e.preventDefault(); close(); return; }
   if (!e.ctrlKey && !e.metaKey) return;
-  if (e.shiftKey || e.altKey) return;
-  if (e.code === 'KeyZ') { e.preventDefault(); undo(); }
-  else if (e.code === 'KeyY') { e.preventDefault(); redo(); }
+  if (e.altKey) return;
+  if (e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (e.code === 'KeyY' && !e.shiftKey) { e.preventDefault(); redo(); }
 });
+
+ipcRenderer.on('board-undo', undo);
+ipcRenderer.on('board-redo', redo);
+// Cmd+W and friends ask the window to close; run the same check the close
+// button does instead of letting an unsaved drawing go quietly.
+ipcRenderer.on('board-close-request', () => close());
 
 // ── opened by the main process ───────────────────────────────────────────
 ipcRenderer.on('board-open', (_e, payload) => {

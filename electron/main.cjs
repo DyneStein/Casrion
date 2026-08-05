@@ -713,6 +713,14 @@ function createBoardWindow() {
   });
   boardWindow.setAlwaysOnTop(true, 'screen-saver');
   floatOverEverything(boardWindow);
+  // A trackpad pinch is easy to trigger by accident with a hand resting on it,
+  // and zooming the drawing surface mid-stroke would be baffling.
+  boardWindow.webContents.setVisualZoomLevelLimits(1, 1).catch(() => {});
+  // Windows and Linux hang the default menu off each window, and its
+  // accelerators fire even though a frameless window shows no menu bar. The
+  // board owns its own keys, so it gets no menu at all. (macOS keeps one menu
+  // for the whole app, so it is handled per-focus below instead.)
+  if (process.platform !== 'darwin') boardWindow.setMenu(null);
   boardWindow.loadFile(path.join(__dirname, 'board.html'));
 
   // Clicking away must not dismiss it (that would bin an unsaved drawing), but
@@ -721,11 +729,65 @@ function createBoardWindow() {
   // again the moment you come back to it.
   boardWindow.on('blur', () => {
     if (boardWindow && !boardWindow.isDestroyed()) boardWindow.setAlwaysOnTop(false);
+    setBoardMenuKeysFree(false);
   });
   boardWindow.on('focus', () => {
     if (boardWindow && !boardWindow.isDestroyed()) boardWindow.setAlwaysOnTop(true, 'screen-saver');
+    setBoardMenuKeysFree(true);
+  });
+  boardWindow.on('hide', () => setBoardMenuKeysFree(false));
+  boardWindow.on('closed', () => setBoardMenuKeysFree(false));
+
+  // Cmd+W, or anything else that asks the window to close, would take an
+  // unsaved drawing with it. Hand the request to the board so it runs the same
+  // "lose this drawing?" check the close button does. Quitting still wins.
+  boardWindow.on('close', (e) => {
+    if (quitting || !boardWindow || boardWindow.isDestroyed()) return;
+    e.preventDefault();
+    boardWindow.webContents.send('board-close-request');
   });
 }
+
+/**
+ * macOS puts one menu bar at the top of the screen for the whole app, and its
+ * key equivalents are matched before a keystroke ever reaches the page. That
+ * means Electron's stock Edit menu quietly eats Cmd+Z and Cmd+Shift+Z, so the
+ * board's undo would never fire, and View > Reload would throw a drawing away
+ * on a stray Cmd+R.
+ *
+ * A disabled item does not claim its key, so the keystroke falls through to
+ * the board. These get switched off while the board has focus and switched
+ * back on the moment it does not, leaving every other window untouched.
+ */
+const BOARD_STOLEN_ROLES = new Set(['undo', 'redo', 'reload', 'forcereload']);
+function setBoardMenuKeysFree(free) {
+  if (process.platform !== 'darwin') return;
+  try {
+    const menu = Menu.getApplicationMenu();
+    if (!menu) return;
+    const walk = (items) => {
+      for (const item of items) {
+        if (item.role && BOARD_STOLEN_ROLES.has(String(item.role).toLowerCase())) item.enabled = !free;
+        if (item.submenu) walk(item.submenu.items);
+      }
+    };
+    walk(menu.items);
+  } catch (e) {
+    console.warn('[Casrion] Could not adjust the menu for the board:', e.message);
+  }
+}
+
+// Belt and braces: whatever route focus took, the moment it lands on any other
+// window the menu goes back to normal. Leaving Cmd+Z switched off for the note
+// editor would be a far worse bug than the one this is fixing.
+app.on('browser-window-focus', (_e, win) => {
+  if (win !== boardWindow) setBoardMenuKeysFree(false);
+});
+
+// True once the user has actually asked to quit, so the board's close guard
+// knows the difference between "Cmd+W" and "the app is going away".
+let quitting = false;
+app.on('before-quit', () => { quitting = true; });
 
 // Fit the plate to whichever monitor the user is on, keeping 16:9 for the
 // drawing area and leaving room for the toolbar and footer.
@@ -747,8 +809,7 @@ function showBoardWindow(payload) {
     height: h
   });
   boardWindow.webContents.send('board-open', payload);
-  boardWindow.show();
-  boardWindow.focus();
+  raiseBoard();
 }
 
 let boardOpening = false;
@@ -756,14 +817,29 @@ let boardOpening = false;
 // land in a different note than the one it was started from.
 let boardNotePath = null;
 
+function boardHasFocus() {
+  return !!(boardWindow && !boardWindow.isDestroyed() && boardWindow.isVisible() && boardWindow.isFocused());
+}
+
+// Bringing the board back to the front. On macOS focusing a window does not
+// make its app the active one, so a board left behind another program would
+// stay behind it; the app has to be raised first.
+function raiseBoard() {
+  if (process.platform === 'darwin') app.focus({ steal: true });
+  // Cmd+M is the stock menu's Minimize, and a board with no taskbar button
+  // would have nowhere to come back from.
+  if (boardWindow.isMinimized()) boardWindow.restore();
+  boardWindow.show();
+  boardWindow.focus();
+}
+
 async function openBoard(relPath) {
   if (boardOpening) return;
 
   // Opening on top of a board that is already up would silently throw away
   // whatever is drawn on it. Bring it forward instead.
   if (boardWindow && !boardWindow.isDestroyed() && boardWindow.isVisible()) {
-    boardWindow.show();
-    boardWindow.focus();
+    raiseBoard();
     showOverlayNotification('The board is already open', 'error');
     return;
   }
@@ -1802,8 +1878,23 @@ function registerShortcuts() {
       const s = beginSourceStamp();
       enqueueCapture(() => captureCodeBlock(s, pre));
     },
-    'CommandOrControl+Shift+Z': () => enqueueCapture(() => performUndo()), // Undo
-    'CommandOrControl+Shift+Y': () => enqueueCapture(() => performRedo()), // Redo
+    // A global shortcut outranks the focused window, so while you are drawing
+    // these would otherwise reach past the board and undo the note behind it.
+    // On a Mac that is a trap with teeth: Cmd+Shift+Z IS redo everywhere else,
+    // so the instinctive keypress would quietly edit the wrong thing. Inside
+    // the board it therefore means what a Mac user means by it, redo, while on
+    // Windows it keeps matching Casrion's own undo.
+    'CommandOrControl+Shift+Z': () => {                                    // Undo
+      if (boardHasFocus()) {
+        boardWindow.webContents.send(isMac ? 'board-redo' : 'board-undo');
+        return;
+      }
+      enqueueCapture(() => performUndo());
+    },
+    'CommandOrControl+Shift+Y': () => {                                    // Redo
+      if (boardHasFocus()) { boardWindow.webContents.send('board-redo'); return; }
+      enqueueCapture(() => performRedo());
+    },
     'CommandOrControl+Shift+H': () => toggleHelpOverlay(),      // Help
     [KEY.quick]: () => toggleQuickInput(),                      // Quick note popup
     'CommandOrControl+Shift+E': () => explainFeature.triggerExplain(), // Explain selection
