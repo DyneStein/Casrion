@@ -142,6 +142,22 @@
     }
     .hint span { color: #5f5344; font-weight: 600; }
     .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Sits where the hint normally goes, so it reads as the same line of small
+       print rather than an alarm. */
+    .hint-fix {
+      background: transparent;
+      border: 1px solid rgba(156, 74, 31, 0.45);
+      border-radius: 3px;
+      color: #9c4a1f;
+      font-family: inherit;
+      font-size: 9.5px;
+      padding: 2px 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hint-fix:hover { background: rgba(156, 74, 31, 0.12); }
     .modes { display: flex; gap: 3px; flex-shrink: 0; }
     .mode {
       background: transparent;
@@ -227,6 +243,9 @@
         <button class="mode" id="modeDetail" title="Fuller answer with more context">Detailed</button>
       </div>
       <div class="hint" id="hint"><span>Esc</span> or click outside to close</div>
+      <!-- Replaces the hint on macOS once we can tell that clicking outside is
+           doing nothing, because the permission it needs was never granted. -->
+      <button class="hint-fix hidden" id="clickAwayFix">Clicking outside not closing this? Fix it</button>
       <div class="actions">
         <button class="act" id="copyBtn">Copy</button>
         <button class="act" id="saveBtn">Save to note</button>
@@ -314,7 +333,16 @@
       progressWrap.classList.add('hidden');
     }
 
+    // macOS only, and only once the main process is fairly sure the click-away
+    // hook is not being delivered. One tap opens the exact settings pane.
+    const clickAwayFix = document.getElementById('clickAwayFix');
+    const hintEl = document.getElementById('hint');
+    clickAwayFix.onclick = () => ipcRenderer.send('explain-fix-click-away');
+
     ipcRenderer.on('explain-context', (_event, ctx) => {
+      const blocked = !!ctx.clickAwayBlocked;
+      clickAwayFix.classList.toggle('hidden', !blocked);
+      hintEl.classList.toggle('hidden', blocked);
       currentSelection = ctx.selection || '';
       appChip.textContent = ctx.app || '';
       detailMode = !!ctx.detail;

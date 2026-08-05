@@ -1015,7 +1015,9 @@ function refreshTrayMenu() {
         label: 'Explain permissions (macOS)',
         submenu: [
           { label: 'Open Accessibility settings (read selection)', click: () => openMacPrivacyPane('Privacy_Accessibility') },
-          { label: 'Open Input Monitoring settings (double-tap Cmd)', click: () => openMacPrivacyPane('Privacy_ListenEvent') }
+          // Not just the gesture: the same event tap is what notices you
+          // clicking away from the popup, so without this it will not close.
+          { label: 'Open Input Monitoring settings (double-tap Cmd, click to close)', click: () => openMacPrivacyPane('Privacy_ListenEvent') }
         ]
       }
     ] : []),

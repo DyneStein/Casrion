@@ -43,6 +43,14 @@ function init(d) {
   deps = d;
   ipcMain.on('explain-hide', () => hideExplain());
   ipcMain.on('explain-download', () => startModelDownload());
+  // From the popup's own footer, when it has noticed clicking away does nothing
+  ipcMain.on('explain-fix-click-away', () => {
+    if (!IS_MAC) return;
+    require('electron').shell
+      .openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent')
+      .catch(() => {});
+    hideExplain();
+  });
   ipcMain.on('explain-mode', (_event, payload) => {
     const settings = deps.getSettings();
     settings.explainDetail = !!(payload && payload.detail);
@@ -100,6 +108,56 @@ function setEnabled(enabled) {
 
 let axPrompted = false;   // macOS: prompted for Accessibility once this run
 let macTrusted = false;   // macOS: Accessibility granted (selection + keys work)
+let sawHookMouse = false; // the global mouse hook has delivered at least one click
+let workspaceSub = null;  // macOS: NSWorkspace app-activation subscription
+let shownCount = 0;       // how many times the popup has been put on screen
+
+/**
+ * Clicking away is supposed to close the popup, and on macOS it quietly did
+ * not. The only thing listening for that click is the global mouse hook, and
+ * the hook's event taps need Input Monitoring, which is a different permission
+ * from the Accessibility one that makes the rest of the feature work. Grant one
+ * and not the other and explaining works perfectly while the answer refuses to
+ * go away.
+ *
+ * So macOS gets a second way out that needs no permission at all: AppKit tells
+ * any app when a different app is brought to the front, which is what clicking
+ * on another window does. It only listens while the popup is actually up.
+ */
+function watchAppSwitch(on) {
+  if (!IS_MAC) return;
+  try {
+    if (on && workspaceSub === null) {
+      workspaceSub = systemPreferences.subscribeWorkspaceNotification(
+        'NSWorkspaceDidActivateApplicationNotification',
+        () => {
+          // Clicking the popup to copy an answer out of it activates Casrion
+          // too, and that is the opposite of clicking away. Let focus settle
+          // for a frame, then only close if the popup did not get it.
+          setTimeout(() => {
+            if (!explainWindow || explainWindow.isDestroyed() || !explainWindow.isVisible()) return;
+            if (explainWindow.isFocused()) return;
+            hideExplain();
+          }, 60);
+        }
+      );
+    } else if (!on && workspaceSub !== null) {
+      systemPreferences.unsubscribeWorkspaceNotification(workspaceSub);
+      workspaceSub = null;
+    }
+  } catch {
+    // Older macOS, or the notification name changed out from under us. The
+    // hook is still there, so this is a fallback losing a fallback.
+    workspaceSub = null;
+  }
+}
+
+// True when we can be reasonably sure the click-away hook is dead: macOS only,
+// and only once the user has had the popup up long enough to have clicked
+// something. Used to explain the missing permission where the symptom is.
+function macClickAwayLikelyBlocked() {
+  return IS_MAC && !sawHookMouse && shownCount >= 2;
+}
 
 // On macOS the hook starts fine without Accessibility permission, but it reads
 // no selection and fires no key/mouse events until the user grants it. The
@@ -146,6 +204,11 @@ function initSelectionHook(promptForTrust) {
     // The popup opens without stealing focus, so blur can't dismiss it.
     // The global mouse hook stands in: any click outside its bounds hides it.
     hook.on('mouse-down', (e) => {
+      // On macOS this whole handler is silent until Input Monitoring is
+      // granted, which is what makes clicking away appear to do nothing.
+      // Remembering that we have seen one is how we can tell the difference
+      // between "not granted" and "granted but you have not clicked yet".
+      sawHookMouse = true;
       if (!explainWindow || explainWindow.isDestroyed() || !explainWindow.isVisible()) return;
       if (e.x === INVALID_COORD || e.y === INVALID_COORD) return;
       const p = toDip({ x: e.x, y: e.y });
@@ -347,6 +410,7 @@ function hideExplain() {
   if (explainWindow && !explainWindow.isDestroyed() && explainWindow.isVisible()) {
     explainWindow.hide();
   }
+  watchAppSwitch(false);
 }
 
 // ── the hotkey flow ─────────────────────────────────────────
@@ -382,13 +446,20 @@ function beginRun(sel) {
     selection: selText,
     app: sel ? prettyAppName(sel.programName) : '',
     detail: deps.getSettings().explainDetail === true,
-    modelLabel: llm.MODEL_LABEL
+    modelLabel: llm.MODEL_LABEL,
+    // Say so in the popup itself, which is the one place the user is looking
+    // when they wonder why it will not go away.
+    clickAwayBlocked: macClickAwayLikelyBlocked()
   });
 
   const showNow = () => {
     // Keep the user's app focused: their selection stays highlighted and
     // they can keep reading while the answer streams in
-    if (explainWindow && !explainWindow.isDestroyed()) explainWindow.showInactive();
+    if (explainWindow && !explainWindow.isDestroyed() && !explainWindow.isVisible()) {
+      shownCount++;
+      explainWindow.showInactive();
+      watchAppSwitch(true);
+    }
   };
 
   if (!selText) {
