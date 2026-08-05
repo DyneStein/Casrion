@@ -30,6 +30,63 @@ jobs:
           # signature, which arm64 macOS requires to launch at all
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
+      # A DMG is a compressed disk image, so nothing about what is inside it can
+      # be checked from a Windows machine after the fact. Check it here, on the
+      # Mac that built it, and check the copy inside the DMG rather than the
+      # loose build folder, because the DMG is what people actually download.
+      - name: Check what actually got packaged
+        run: |
+          set -euo pipefail
+          hdiutil attach dist-electron/*.dmg -nobrowse -quiet -mountpoint /tmp/casrion-dmg
+          APP=/tmp/casrion-dmg/Casrion.app
+          test -d "$APP"
+
+          echo "── architecture ──"
+          file "$APP/Contents/MacOS/Casrion"
+          file "$APP/Contents/MacOS/Casrion" | grep -q arm64
+
+          echo "── signature ──"
+          codesign --verify --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E 'Signature|Identifier|TeamIdentifier' || true
+
+          echo "── minimum system version ──"
+          /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' "$APP/Contents/Info.plist"
+
+          echo "── contents of app.asar ──"
+          node -e '
+            const asar = require("@electron/asar");
+            const app = process.argv[1] + "/Contents/Resources/app.asar";
+            // listPackage hands back native separators. Never write one
+            // literally here: every shell between the file and node eats it.
+            const SEP = String.fromCharCode(92);
+            const files = asar.listPackage(app).map((f) => f.split(SEP).join("/"));
+            console.log(files.filter((f) => f.startsWith("/electron/")).join("\n"));
+
+            // board.html is copied in as-is rather than obfuscated, so its own
+            // source is the honest proof of which build this is.
+            const board = asar.extractFile(app, "electron/board.html").toString("utf8");
+            const markers = ["board-close-request", "sizeCanvases", "board-undo", "board-redo", "Casrion Whiteboard"];
+            const missing = markers.filter((m) => !board.includes(m));
+            if (missing.length) { console.error("board.html is stale, missing: " + missing.join(", ")); process.exit(1); }
+            console.log("\nboard.html carries every marker from this commit");
+
+            for (const need of ["/electron/main.cjs", "/electron/preload.cjs", "/electron/board.html",
+                                "/electron/help-overlay.html", "/electron/quick-input.html",
+                                "/electron/explain-overlay.html", "/electron/overlay.html"]) {
+              if (!files.includes(need)) { console.error("MISSING from the package: " + need); process.exit(1); }
+            }
+            console.log("every window the app opens is packed");
+          ' "$APP"
+
+          echo "── native modules must be unpacked, not sealed in the asar ──"
+          ls "$APP/Contents/Resources/app.asar.unpacked/node_modules/selection-hook/prebuilds/"
+          ls "$APP/Contents/Resources/app.asar.unpacked/node_modules/@node-llama-cpp/"
+
+          hdiutil detach /tmp/casrion-dmg -quiet
+          echo "the DMG checks out"
+
       - uses: actions/upload-artifact@v4
         with:
           name: Casrion-mac-arm64
