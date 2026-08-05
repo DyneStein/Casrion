@@ -27,11 +27,11 @@
 
     <p class="lede">
       The moment worth keeping and the moment you have time to write it down are
-      never the same one. So Casrion puts the whole detour on a single key.
+      never the same one. So Casrion puts the whole detour on one key.
       <span data-auto>You copy the line, you press it, you keep reading.</span>
     </p>
 
-    <p class="try">Like that. Select any sentence here and click the tag.</p>
+    <p class="try">Go on. Select any sentence here and click the tag.</p>
 
     <p class="aside">
       In the app that key is <kbd>Ctrl+Shift+C</kbd>. Your browser keeps that one
@@ -55,18 +55,9 @@
       <li><span class="k-what">Undo the last one</span><b class="k-key" data-combo="z">Ctrl+Shift+Z</b><span class="k-mine">try it</span></li>
     </ul>
 
-    <ul class="app-keys">
-      <li>Screenshot <b>Ctrl+Shift+V</b></li>
-      <li>Voice memo <b>Ctrl+Shift+M</b></li>
-      <li>Quick writer <b data-mac="Cmd+Shift+J">Ctrl+Shift+Q</b></li>
-      <li>Explain <b data-mac="Cmd+Shift+E">Ctrl+Shift+E</b></li>
-      <li>New paragraph <b>Ctrl+Shift+N</b></li>
-      <li>Colour <b data-mac="Cmd+Ctrl+R / G / B">Alt+R / G / B</b></li>
-      <li>All of them <b>Ctrl+Shift+H</b></li>
-    </ul>
-    <p class="footnote" id="mac-keynote" hidden>
-      Showing Mac keys. A few are not a straight Ctrl to Cmd swap, because macOS
-      keeps those combinations for itself.
+    <p class="footnote">
+      There are more, and they are all on your platform's page. Screenshots,
+      voice memos, a whiteboard, a writer that floats over everything.
     </p>
 
     <h2 id="source">It remembers where you got it</h2>
@@ -87,126 +78,66 @@
     </p>
 
     <p>
-      That is a language model on your own disk, so nothing is sent anywhere. It
-      stays unloaded until you look like you need it and hands the memory back
-      five minutes after you stop. Idle, the whole app sits under 450 MB.
+      That is a language model sitting on your own disk. Nothing is sent
+      anywhere. It stays unloaded until you look like you need it and hands the
+      memory back five minutes after you stop.
     </p>
 
-    <h2 id="quick">Thoughts that started in your head</h2>
+    <h2 id="draw">Some things are a diagram</h2>
 
     <p>
-      Not everything is copied. A small writer floats over whatever you are doing,
-      takes the thought, and vanishes, with Markdown working as you type. Or hold
-      a key and just say it, for the thoughts that typing would kill.
+      Not everything wants to be a sentence. Hit the whiteboard key anywhere,
+      draw the thing, and it drops into the note as an ordinary <code>.svg</code>
+      that opens in any browser with or without this app. Double-click it later
+      and the markers are still there.
     </p>
-
-    <!-- Screenshot slot. When there is a real one, drop it in here:
-         <figure class="shot">
-           <img src="./art/screenshot.png" alt="Casrion with a note open" width="1400" height="900">
-           <figcaption>Casrion, mid session.</figcaption>
-         </figure>
-    -->
 
     <h2 id="private">Nothing leaves your machine</h2>
 
     <p>
-      Casrion makes no network requests. Not fewer than most, none. Delete it
+      Casrion makes no network requests. Not fewer than most. None. Delete it
       tomorrow and every note you made is still sitting there, readable in
       Notepad.
     </p>
 
     <table class="spec">
       <tr><th>Runs on</th><td>Windows 10 and 11, macOS 11+ on Apple Silicon</td></tr>
-      <tr><th>Install size</th><td>about 100 MB</td></tr>
-      <tr><th>Idle memory</th><td>about 450 MB</td></tr>
       <tr><th>Your notes</th><td>plain Markdown, in folders you pick</td></tr>
+      <tr><th>Idle memory</th><td>about 450 MB</td></tr>
       <tr><th>Network, account, telemetry</th><td>none, none, none</td></tr>
       <tr><th>Price</th><td>free</td></tr>
     </table>
 
     <h2 id="get">Go get it</h2>
 
-    <p class="grab">
-      <a class="btn" href="/get">Download for Windows</a>
-      <a class="btn btn-quiet" href="/get-mac">Download for Mac</a>
+    <p>
+      Pick your side. Each one has its own keys, its own two minutes of setup,
+      and its own list of things that might go wrong.
     </p>
+
+    <div class="doors">
+      <a class="door" href="/windows">
+        <span class="door-os">Windows 10 &amp; 11</span>
+        <span class="door-name">Get it for Windows</span>
+        <span class="door-sub">One installer. One blue box to click past.</span>
+        <span class="door-go">Keys and setup</span>
+      </a>
+      <a class="door" href="/mac">
+        <span class="door-os">macOS 11+ &middot; Apple Silicon</span>
+        <span class="door-name">Get it for Mac</span>
+        <span class="door-sub">A .dmg, and a few switches macOS wants flipped.</span>
+        <span class="door-go">Keys and setup</span>
+      </a>
+    </div>
 
     <p class="footnote">
-      No email, no sign up. The installer is unsigned because the certificate
-      costs more than this app makes, so SmartScreen shows a blue box the first
-      time: <b>More info</b>, then <b>Run anyway</b>. Once, never again.
+      No email, no sign up, no trial that expires. It is one person's app and it
+      is free.
     </p>
-
-    <h2 id="mac">Mac wants two minutes first</h2>
-
-    <p>
-      Apple charges for a signature too, so macOS treats Casrion as a stranger
-      once. Then it is done forever.
-    </p>
-
-    <ol class="setup">
-      <li>
-        <h3>Drag it into Applications</h3>
-        <p>Straight out of the <code>.dmg</code>.</p>
-      </li>
-      <li>
-        <h3>Right click it, choose Open</h3>
-        <p>
-          Then <b>Open</b> again in the dialog. That gets you past the first
-          launch block.
-          <span class="more">Still refusing? Run <code>xattr -cr /Applications/Casrion.app</code> in Terminal once, then open it normally.</span>
-        </p>
-      </li>
-      <li>
-        <h3>Switch on Accessibility</h3>
-        <p>
-          <b>System Settings &rarr; Privacy &amp; Security &rarr; Accessibility</b>.
-          Explain needs it to read what you highlighted. Casrion opens that pane
-          for you the first time you ask it to explain something.
-        </p>
-      </li>
-      <li>
-        <h3>Switch on Input Monitoring, if you want the double tap</h3>
-        <p>
-          macOS guards raw key taps separately. Skip this and
-          <kbd>Cmd+Shift+E</kbd> still works fine.
-        </p>
-      </li>
-      <li>
-        <h3>Quit and reopen once</h3>
-        <p>
-          From the menu bar icon, so macOS actually applies the switches. The
-          microphone and browser questions just appear when you first need them,
-          click <b>Allow</b>.
-        </p>
-      </li>
-    </ol>
-
-    <h2 id="questions">Fair questions</h2>
-
-    <dl class="qa">
-      <dt>Windows says it protected my PC.</dt>
-      <dd>SmartScreen, for any installer without an expensive certificate. Nothing was found. <b>More info</b>, then <b>Run anyway</b>.</dd>
-
-      <dt>Where do my notes live?</dt>
-      <dd>Markdown files in folders you pick, with screenshots and voice memos in an assets folder beside them. They are just files.</dd>
-
-      <dt>Does it need internet?</dt>
-      <dd>Never. Explain downloads its model once if you turn it on, and after that even that works on a plane.</dd>
-
-      <dt>How do I quit it, or update it?</dt>
-      <dd>Closing the window leaves it capturing from the tray, which is the point. Right click the tray icon to really quit. To update, run the new installer over the old one. Your notes are untouched.</dd>
-
-      <dt>My Mac says Casrion cannot be opened.</dt>
-      <dd>Right click it in Applications and choose <b>Open</b>, then <b>Open</b> again. If it still refuses, <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.</dd>
-
-      <dt>I updated on Mac and a permission stopped working.</dt>
-      <dd>macOS ties them to the exact copy, so the checkmarks can go stale while still looking on. Remove Casrion from <b>Accessibility</b> and <b>Input Monitoring</b> with <b>&minus;</b>, add it back with <b>+</b>, quit and reopen.</dd>
-    </dl>
 
     <footer class="colophon">
       <p>
-        One person's app, free, and staying offline. The source is
+        Staying offline on purpose. The source is
         <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>
         if you read that sort of thing for fun. Stuck on something?
         <a href="mailto:hello@casrion.com">hello@casrion.com</a>.

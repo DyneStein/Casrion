@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casrion for Windows</title>
+  <meta name="description" content="Casrion on Windows 10 and 11. Every shortcut, the one install quirk, and what to do when something acts up.">
+  <link rel="icon" type="image/png" href="./favicon-32.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<div class="solo">
+  <main class="reading">
+
+    <header class="top">
+      <span class="wordmark">
+        <img src="./logo-64.png" alt="" width="24" height="24">
+        Casrion
+      </span>
+      <a class="top-get" href="/mac">On a Mac?</a>
+    </header>
+
+    <a class="crumb" href="/">Back</a>
+
+    <div class="os-badge">Windows 10 &amp; 11</div>
+
+    <h1>Casrion, on Windows.</h1>
+
+    <p class="lede">
+      Download, run, click past one blue box, done. Then it lives in your tray
+      and every shortcut below works in every app you have open.
+    </p>
+
+    <p class="grab">
+      <a class="btn" href="/get">Download for Windows</a>
+    </p>
+
+    <p class="footnote">
+      64-bit, Windows 10 or 11. Free, no email, no account.
+    </p>
+
+    <h2 id="install">The blue box</h2>
+
+    <p>
+      Windows will say it protected your PC. That is SmartScreen, and it says it
+      about any installer whose author has not bought a code signing certificate.
+      That certificate costs more per year than this app makes, which is nothing,
+      so I have not.
+    </p>
+
+    <p>
+      Click <b>More info</b>, then <b>Run anyway</b>. It happens once, and never
+      again. Nothing was found, nothing was scanned and flagged. It is just a
+      name Windows does not recognise.
+    </p>
+
+    <h2 id="keys">Every key</h2>
+
+    <p>
+      All of these work everywhere: your browser, a PDF, Word, a terminal. Copy
+      something first with <kbd>Ctrl+C</kbd>, then press the one you want. Inside
+      the app, <kbd>Ctrl+Shift+H</kbd> shows this same list at any time.
+    </p>
+
+    <table class="keytable">
+      <caption>Copy first, then press</caption>
+      <tr><td>Keep it as it is</td><td>Ctrl+Shift+C</td></tr>
+      <tr><td>Keep it as a big heading</td><td>Ctrl+Shift+1</td></tr>
+      <tr><td>Medium heading</td><td>Ctrl+Shift+2</td></tr>
+      <tr><td>Small heading</td><td>Ctrl+Shift+3</td></tr>
+      <tr><td>Keep it as code</td><td>Ctrl+Shift+K</td></tr>
+      <tr><td>Keep it bold</td><td>Ctrl+Shift+B</td></tr>
+      <tr><td>Keep it italic</td><td>Ctrl+Shift+I</td></tr>
+      <tr><td>Keep it red, green or blue</td><td>Alt+R / G / B</td></tr>
+    </table>
+
+    <table class="keytable">
+      <caption>Nothing to copy</caption>
+      <tr>
+        <td>Drop in a screenshot
+          <span class="why">Snip it with Win+Shift+S first, then this.</span>
+        </td>
+        <td>Ctrl+Shift+V</td>
+      </tr>
+      <tr><td>Start or stop a voice memo</td><td>Ctrl+Shift+M</td></tr>
+      <tr><td>Open a whiteboard and draw</td><td>Ctrl+Shift+D</td></tr>
+      <tr><td>Type a quick note from anywhere</td><td>Ctrl+Shift+Q</td></tr>
+      <tr><td>Start a new paragraph</td><td>Ctrl+Shift+N</td></tr>
+      <tr><td>Undo the last capture</td><td>Ctrl+Shift+Z</td></tr>
+      <tr><td>Redo it</td><td>Ctrl+Shift+Y</td></tr>
+    </table>
+
+    <table class="keytable">
+      <caption>Explain a selection</caption>
+      <tr>
+        <td>Explain what I highlighted
+          <span class="why">Tap Ctrl twice, quickly, without holding it.</span>
+        </td>
+        <td>Ctrl, Ctrl</td>
+      </tr>
+      <tr><td>Same thing, if you prefer a chord</td><td>Ctrl+Shift+E</td></tr>
+    </table>
+
+    <table class="keytable">
+      <caption>Inside the whiteboard</caption>
+      <tr><td>Undo a stroke</td><td>Ctrl+Z</td></tr>
+      <tr><td>Put it back</td><td>Ctrl+Y</td></tr>
+      <tr><td>Close without saving</td><td>Esc</td></tr>
+    </table>
+
+    <h2 id="explain">The explain thing</h2>
+
+    <p>
+      Highlight anything, anywhere, tap <kbd>Ctrl</kbd> twice, and a small window
+      tells you what it says. It reads the screen around your selection first, so
+      it knows a loose symbol belongs to the formula three lines up.
+    </p>
+
+    <p>
+      The first time you use it, it downloads a small model, once. After that it
+      works on a plane. Nothing you highlight is ever sent anywhere, because
+      there is nowhere for it to be sent to.
+    </p>
+
+    <h2 id="questions">When something acts up</h2>
+
+    <dl class="qa">
+      <dt>Windows says it protected my PC.</dt>
+      <dd>SmartScreen. <b>More info</b>, then <b>Run anyway</b>. Once.</dd>
+
+      <dt>A shortcut does nothing.</dt>
+      <dd>Something else on your machine grabbed that combination first, and whoever registers it first wins. Games, capture tools and clipboard managers are the usual suspects. Close the suspect and try again.</dd>
+
+      <dt>I closed the window and it vanished.</dt>
+      <dd>It did not. Closing the window is how you get it out of the way while it keeps capturing. It is in the tray, next to the clock, possibly under the little arrow. Right click there to actually quit.</dd>
+
+      <dt>Where do my notes live?</dt>
+      <dd>Markdown files in folders you picked, with screenshots, voice memos and whiteboards in an <code>assets</code> folder beside them. Nothing is in a database. They are just files.</dd>
+
+      <dt>How do I update it?</dt>
+      <dd>Run the new installer over the old one. Your notes and settings are untouched.</dd>
+
+      <dt>Does it phone home?</dt>
+      <dd>No. There is no account, no telemetry, no update check. The one and only download it ever makes is the explain model, and only if you ask for it.</dd>
+    </dl>
+
+    <footer class="colophon">
+      <p>
+        Source is <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>.
+        Something broken? <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
+      </p>
+      <p class="sign">Go keep something.</p>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>
