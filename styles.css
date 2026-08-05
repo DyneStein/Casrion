@@ -22,6 +22,10 @@
      the one colour instead of six hardcoded rgba()s drifting apart. */
   --stamp-rgb: 212, 163, 115;
   --shadow: rgba(0, 0, 0, 0.55);
+  /* Lucide's chevron-right, the same glyph the app puts in the margin to show
+     which line your next capture lands on. Used as a mask so it takes the
+     colour of whatever it marks. */
+  --caret-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
   --on-stamp: #1a1512;   /* text that sits on top of the accent */
   --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
@@ -62,17 +66,37 @@ a:hover { text-decoration-thickness: 2px; }
 
 code, .mono { font-family: var(--mono); }
 
-kbd {
+/* ═══ Keycaps ═════════════════════════════════════
+   This is an app about which key you press, so the keys are the one thing on
+   the page allowed to look like objects. Same construction the app's own help
+   overlay uses: a cap per key, a thicker bottom edge for the sat-in-a-socket
+   depth, and a thin + between them rather than the keys being run together
+   into one string of mono text. */
+kbd, .cap {
+  display: inline-block;
   font-family: var(--mono);
-  font-size: 0.74em;
-  background: var(--paper-card);
-  border: 1px solid var(--rule);
+  font-size: 0.78em;
+  line-height: 1.55;
+  min-width: 1.6em;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-bottom-color: rgba(0, 0, 0, 0.6);
   border-bottom-width: 2px;
-  border-radius: 3px;
+  border-radius: 4px;
   padding: 1px 6px;
   white-space: nowrap;
-  color: var(--ink-soft);
+  color: var(--ink);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
+
+/* A whole combination, so the caps stay together when a line wraps. */
+.combo { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.combo .sep { font-family: var(--mono); font-size: 0.62em; color: var(--ink-faint); }
+/* Double-tap gestures are one key twice, not a chord, and the comma says so. */
+.combo .sep-tap { letter-spacing: 0.1em; }
+/* The keys are the subject of these pages, so they sit up in the accent. */
+.combo-lead .cap { color: var(--stamp); border-color: rgba(var(--stamp-rgb), 0.32); }
 
 /* ═══ Frame ═══════════════════════════════════════ */
 .wrap {
@@ -102,12 +126,14 @@ kbd {
 
 /* ═══ The writing ═════════════════════════════════ */
 h1 {
-  font-size: clamp(2.05rem, 4.6vw, 2.85rem);
-  line-height: 1.08;
+  /* Everything on this page was one of two sizes, which is what made it read
+     as flat. The headline now actually is a headline. */
+  font-size: clamp(2.4rem, 5.6vw, 3.6rem);
+  line-height: 1.02;
   font-weight: 600;
-  letter-spacing: -0.022em;
-  margin-bottom: 1.35rem;
-  max-width: 17ch;
+  letter-spacing: -0.032em;
+  margin-bottom: 1.5rem;
+  max-width: 19ch;
   text-wrap: balance;
 }
 
@@ -122,12 +148,23 @@ h2 {
   text-wrap: balance;
   position: relative;
 }
-/* a small pen stroke where a section starts, instead of a numbered label */
+/* The app marks the line your next capture will land on with a chevron in the
+   margin. Same glyph, same job here: it points at where you are. A generic
+   dash would have done nothing this specific. */
 h2::before {
   content: "";
-  position: absolute; left: -1.5rem; top: 0.72em;
-  width: 0.85rem; height: 2px;
-  background: var(--stamp); opacity: 0.55;
+  position: absolute; left: -1.55rem; top: 0.46em;
+  width: 0.72rem; height: 0.72rem;
+  background-color: var(--stamp);
+  opacity: 0.6;
+  -webkit-mask-image: var(--caret-mask);
+  mask-image: var(--caret-mask);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 h3 { font-size: 1.03rem; font-weight: 600; margin-bottom: 0.3rem; }
@@ -135,9 +172,13 @@ h3 { font-size: 1.03rem; font-weight: 600; margin-bottom: 0.3rem; }
 p { margin-bottom: 1.1rem; }
 /* set like a book: the first paragraph is flush, the ones that follow indent */
 .reading > p + p { text-indent: 1.4rem; margin-top: -0.5rem; }
+/* The indent is for a continuation of the same thought. A lede, a caption or
+   the line under a headline is a fresh start, so it stays flush. */
 .reading > p + p.try,
 .reading > p + p.aside,
 .reading > p + p.grab,
+.reading > p + p.lede,
+.reading > p + p.os-line,
 .reading > p + p.footnote { text-indent: 0; margin-top: 0; }
 
 .lede {
@@ -205,11 +246,8 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
   font-size: 0.95rem;
 }
 .keylist li:first-child { border-top: 1px solid var(--rule-soft); }
-.k-key {
-  font-family: var(--mono); font-weight: 400;
-  font-size: 0.78rem; color: var(--ink-soft);
-  white-space: nowrap;
-}
+/* Now only a container: the caps inside it carry the look. */
+.k-key { font-weight: 400; white-space: nowrap; }
 .k-mine {
   font-size: 0.72rem; color: var(--stamp); opacity: 0.75;
   text-align: right; white-space: nowrap;
@@ -243,99 +281,101 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
 .spec td { padding: 0.5rem 0.15rem; }
 
 /* ═══ Download ════════════════════════════════════ */
-.grab { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 1.6rem 0 0.6rem; }
+.grab { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.1rem; margin: 1.8rem 0 0.6rem; }
 .btn {
-  font-family: var(--mono); font-size: 0.82rem; letter-spacing: 0.02em;
+  font-family: var(--mono); font-size: 0.86rem; letter-spacing: 0.01em;
   text-decoration: none;
   color: var(--on-stamp); background: var(--stamp);
-  border: 2px solid var(--stamp);
-  padding: 0.72rem 1.2rem;
-  transition: transform 0.15s ease, background 0.15s ease;
+  border: 1px solid var(--stamp);
+  /* The same sat-in-a-socket edge the keycaps have, because on this site the
+     download is just the biggest key on the page. */
+  border-bottom: 3px solid #a97c4f;
+  border-radius: 4px;
+  padding: 0.78rem 1.4rem;
+  transition: transform 0.12s ease, background 0.15s ease, border-bottom-width 0.12s ease;
 }
-.btn:hover { transform: translateY(-1px); background: var(--accent); }
+.btn:hover { background: var(--accent); }
+.btn:active { transform: translateY(2px); border-bottom-width: 1px; }
+/* What you are actually getting, next to the button rather than under it. */
+.grab-meta { font-size: 0.82rem; color: var(--ink-faint); line-height: 1.45; }
 .btn-quiet { background: transparent; color: var(--stamp); }
 .btn-quiet:hover { background: rgba(var(--stamp-rgb), 0.09); }
 
 /* ═══ Platform doors ══════════════════════════════ */
-/* The front page stops trying to serve both operating systems at once and
-   sends you to your own. Two doors, and whichever one is yours is obvious. */
-.doors {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.9rem;
-  margin: 1.8rem 0 1rem;
-}
+/* Two bordered cards side by side is the landing-page skeleton every product
+   uses. These are two entries in a table of contents instead: full width, a
+   hairline between them, and the OS hanging out in the left gutter where a
+   book would put a folio. */
+.doors { margin: 1.8rem 0 1rem; border-top: 1px solid var(--rule); }
 .door {
-  display: block;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0 1.2rem;
+  padding: 1.15rem 0.15rem;
+  border-bottom: 1px solid var(--rule);
   text-decoration: none;
   color: inherit;
-  background: var(--paper-card);
-  border: 1px solid var(--rule);
-  padding: 1.1rem 1.15rem 1rem;
-  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+  transition: background 0.16s ease, padding-left 0.16s ease;
 }
-.door:hover {
-  border-color: rgba(var(--stamp-rgb), 0.55);
-  background: rgba(var(--stamp-rgb), 0.05);
-  transform: translateY(-2px);
+.door:hover { background: rgba(var(--stamp-rgb), 0.045); padding-left: 0.5rem; }
+.door-name { font-size: 1.42rem; font-weight: 600; line-height: 1.15; letter-spacing: -0.018em; }
+/* The version sits with the name, not in a column of its own: "Windows" is
+   what you are picking, "10 and 11" is a detail about it. */
+.door-os { font-size: 0.92rem; font-weight: 400; color: var(--ink-soft); margin-left: 0.5rem; }
+.door-sub {
+  grid-column: 1 / -1;
+  font-size: 0.88rem; color: var(--ink-faint);
+  margin-top: 0.3rem;
 }
-.door-os {
-  display: block;
-  font-family: var(--mono); font-size: 0.66rem;
-  letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-bottom: 0.45rem;
+.door-go { font-family: var(--mono); font-size: 0.74rem; color: var(--stamp); white-space: nowrap; }
+.door-go::after { content: "  \203A"; font-size: 1.15em; }
+@media (max-width: 30rem) {
+  .door { grid-template-columns: 1fr; }
+  .door-go { margin-top: 0.5rem; }
 }
-.door-name { display: block; font-size: 1.16rem; font-weight: 600; line-height: 1.2; }
-.door-sub { display: block; font-size: 0.84rem; color: var(--ink-soft); margin-top: 0.3rem; }
-.door-go {
-  display: block; margin-top: 0.7rem;
-  font-family: var(--mono); font-size: 0.72rem; color: var(--stamp);
-}
-.door-go::after { content: " \2192"; }
 
 /* ═══ Full shortcut reference (platform pages) ════ */
-.keytable { width: 100%; border-collapse: collapse; margin: 1.2rem 0 1rem; font-size: 0.93rem; }
-.keytable caption {
-  text-align: left;
-  font-family: var(--mono); font-size: 0.66rem;
-  letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--ink-faint);
-  padding-bottom: 0.5rem;
-}
+/* Each group is introduced by an ordinary heading. It used to be a tracked-out
+   uppercase mono label, four times a page, which is the single most template
+   thing a page can do. */
+.keygroup { font-size: 1.02rem; font-weight: 600; margin: 2.2rem 0 0.2rem; }
+.keygroup + p { font-size: 0.9rem; color: var(--ink-soft); margin-bottom: 0.8rem; }
+
+.keytable { width: 100%; border-collapse: collapse; margin: 0.9rem 0 1rem; font-size: 0.95rem; }
 .keytable tr { border-bottom: 1px solid var(--rule-soft); }
 .keytable tr:first-child { border-top: 1px solid var(--rule-soft); }
-.keytable td { padding: 0.48rem 0.15rem; vertical-align: baseline; }
-.keytable td:last-child {
-  text-align: right; white-space: nowrap;
-  font-family: var(--mono); font-size: 0.76rem; color: var(--stamp);
-}
+.keytable td { padding: 0.6rem 0.15rem; vertical-align: baseline; }
+.keytable td:last-child { text-align: right; white-space: nowrap; padding-left: 1rem; }
 /* The odd one out gets a note rather than a footnote nobody reads. */
-.keytable .why { display: block; font-size: 0.78rem; color: var(--ink-faint); }
+.keytable .why { display: block; font-size: 0.8rem; color: var(--ink-faint); margin-top: 0.1rem; }
+
+@media (max-width: 32rem) {
+  /* Side by side, the caps squeeze the description into two words a line. */
+  .keytable td { display: block; padding: 0.55rem 0.15rem 0; }
+  .keytable td:last-child { text-align: left; padding: 0.3rem 0.15rem 0.6rem; }
+}
 
 /* ═══ Platform page furniture ═════════════════════ */
 .crumb {
-  /* Its own line: sat inline it collides with the badge underneath it. */
+  /* Its own line: sat inline it collides with what follows it. */
   display: block;
   width: fit-content;
   font-family: var(--mono); font-size: 0.72rem;
   color: var(--ink-soft); text-decoration: none;
-  margin-bottom: 1.1rem;
+  margin-bottom: 1.6rem;
 }
-.crumb::before { content: "\2190  "; color: var(--stamp); }
+.crumb::before { content: "\2039  "; color: var(--stamp); font-size: 1.15em; }
 .crumb:hover { color: var(--stamp); }
 
-/* A page that is only about one OS says so once, loudly, then shuts up. */
-.os-badge {
-  display: inline-block;
-  font-family: var(--mono); font-size: 0.64rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--stamp);
-  border: 1px solid rgba(var(--stamp-rgb), 0.4);
-  border-radius: 2px;
-  padding: 0.2rem 0.5rem;
-  margin-bottom: 1rem;
+/* The OS belongs in the sentence under the headline, not in a floating pill
+   above it. This is just the line that says which machine you are on. */
+.os-line {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin: -0.7rem 0 1.5rem;
 }
+.os-line b { color: var(--ink); font-weight: 600; }
 
 /* Platform pages have no notebook beside them, so the column stands alone. */
 .solo { max-width: 40rem; margin: 0 auto; padding: 0 2rem 6rem; }
@@ -396,7 +436,9 @@ mark.kept mark.kept { background-image: none; padding: 0; margin: 0; }
   display: flex; flex-direction: column;
   /* starts modest and grows as you fill it, rather than looming empty */
   height: auto;
-  min-height: 15rem;
+  /* Tall enough to read as a notebook page waiting for something. At 15rem it
+     was a small box marooned in a lot of empty column. */
+  min-height: 19.5rem;
   max-height: min(44rem, calc(100vh - 3.2rem));
   transition: min-height 0.3s ease;
   background: var(--paper-card);

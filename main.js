@@ -27,10 +27,15 @@
   var demoDone = false;
 
   /* ── Mac key labels ─────────────────────────────── */
+  /* Keys are rendered as one keycap each, so this relabels the caps in place.
+     Rewriting the textContent of the whole combination, which is what this
+     used to do, would flatten the caps back into a string. */
   if (isMac) {
-    document.querySelectorAll('kbd, .k-key, .tag-key, .app-keys b').forEach(function (el) {
-      var mac = el.getAttribute('data-mac');
-      el.textContent = mac ? mac : el.textContent.replace(/Ctrl/g, 'Cmd');
+    document.querySelectorAll('.cap').forEach(function (el) {
+      if (el.textContent.trim() === 'Ctrl') el.textContent = 'Cmd';
+    });
+    document.querySelectorAll('.tag-key').forEach(function (el) {
+      el.textContent = el.textContent.replace(/Ctrl/g, 'Cmd');
     });
     var note = document.getElementById('mac-keynote');
     if (note) note.hidden = false;

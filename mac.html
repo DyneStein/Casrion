@@ -23,22 +23,19 @@
 
     <a class="crumb" href="/">Back</a>
 
-    <div class="os-badge">macOS 11+ &middot; Apple Silicon</div>
-
     <h1>Casrion, on a Mac.</h1>
 
+    <p class="os-line">For <b>macOS 11 and later</b>, Apple Silicon.</p>
+
     <p class="lede">
-      Two minutes of switch flipping, because macOS wants to be asked before an
-      app can read what you highlighted. Then it lives in your menu bar and gets
-      out of the way.
+      Two minutes of flipping switches, because macOS wants to be asked before
+      an app can read what you highlighted. Then it lives in your menu bar and
+      gets out of the way.
     </p>
 
     <p class="grab">
       <a class="btn" href="/get-mac">Download for Mac</a>
-    </p>
-
-    <p class="footnote">
-      Apple Silicon only, macOS 11 or later. Free, no email, no account.
+      <span class="grab-meta">Free, no email, no account.<br>Apple Silicon only, for now.</span>
     </p>
 
     <h2 id="install">Getting it open</h2>
@@ -73,11 +70,11 @@
       <li>
         <h3>Turn on Input Monitoring</h3>
         <p>
-          <b>Privacy &amp; Security &rarr; Input Monitoring</b>. macOS guards raw
-          key and mouse taps separately from the one above, which catches people
-          out. This is what makes the double-tap Cmd gesture fire, and what lets
-          the explain popup notice you clicking away from it.
-          <span class="more">Skip it and everything else still works, you just use Cmd+Shift+E and close the popup with its own button.</span>
+          Same place, one row down. macOS guards raw key and mouse taps
+          separately from the switch above, which catches people out. This is
+          what makes the double-tap gesture fire, and what lets the explain
+          popup notice you clicking away from it.
+          <span class="more">Skip it and everything else still works. You just use <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> and close the popup with its own button.</span>
         </p>
       </li>
       <li>
@@ -93,71 +90,119 @@
     <h2 id="keys">Every key</h2>
 
     <p>
-      Mostly Cmd where Windows uses Ctrl. Three of them are not, because macOS
-      keeps those combinations for itself and will not give them up. Those are
-      marked. Inside the app, <kbd>Cmd+Shift+H</kbd> shows this list any time.
+      Mostly Cmd where Windows uses Ctrl. Three are not, because macOS keeps
+      those combinations for itself and will not give them up. Those say so on
+      the line. Inside the app,
+      <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>H</kbd> puts this list on screen
+      whenever you want it.
     </p>
 
-    <table class="keytable">
-      <caption>Copy first, then press</caption>
-      <tr><td>Keep it as it is</td><td>Cmd+Shift+C</td></tr>
-      <tr><td>Keep it as a big heading</td><td>Cmd+Shift+1</td></tr>
-      <tr><td>Medium heading</td><td>Cmd+Shift+2</td></tr>
-      <tr>
-        <td>Small heading
-          <span class="why">Not Cmd+Shift+3. That one takes a screenshot.</span>
-        </td>
-        <td>Cmd+Ctrl+3</td>
-      </tr>
-      <tr><td>Keep it as code</td><td>Cmd+Shift+K</td></tr>
-      <tr><td>Keep it bold</td><td>Cmd+Shift+B</td></tr>
-      <tr><td>Keep it italic</td><td>Cmd+Shift+I</td></tr>
-      <tr>
-        <td>Keep it red, green or blue
-          <span class="why">Not Option+R/G/B. On a Mac those type ® ˝ ∫.</span>
-        </td>
-        <td>Cmd+Ctrl+R / G / B</td>
-      </tr>
-    </table>
+    <!--KEYS-->
+      <h3 class="keygroup">Copy something first, then press</h3>
+      <p>Anything you can select and copy, in any app you have open.</p>
+      <table class="keytable">
+        <tr>
+          <td>Keep it as it is</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">C</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it as a big heading</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">1</span></span></td>
+        </tr>
+        <tr>
+          <td>Medium heading</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">2</span></span></td>
+        </tr>
+        <tr>
+          <td>Small heading
+          <span class="why">Not Cmd+Shift+3. macOS takes a screenshot with that one.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">3</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it as code</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">K</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it bold</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">B</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it italic</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">I</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it red, green or blue
+          <span class="why">Not Option+R/G/B. On a Mac those type &reg; &#729; &int;.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">R</span><span class="sep">/</span><span class="cap">G</span><span class="sep">/</span><span class="cap">B</span></span></td>
+        </tr>
+      </table>
 
-    <table class="keytable">
-      <caption>Nothing to copy</caption>
-      <tr>
-        <td>Drop in a screenshot
-          <span class="why">Ctrl+Cmd+Shift+4 to snip. The Ctrl is what puts it on the clipboard instead of your desktop.</span>
-        </td>
-        <td>Cmd+Shift+V</td>
-      </tr>
-      <tr><td>Start or stop a voice memo</td><td>Cmd+Shift+M</td></tr>
-      <tr><td>Open a whiteboard and draw</td><td>Cmd+Shift+D</td></tr>
-      <tr>
-        <td>Type a quick note from anywhere
-          <span class="why">Not Cmd+Shift+Q. That one logs you out.</span>
-        </td>
-        <td>Cmd+Shift+J</td>
-      </tr>
-      <tr><td>Start a new paragraph</td><td>Cmd+Shift+N</td></tr>
-      <tr><td>Undo the last capture</td><td>Cmd+Shift+Z</td></tr>
-      <tr><td>Redo it</td><td>Cmd+Shift+Y</td></tr>
-    </table>
+      <h3 class="keygroup">Nothing to copy</h3>
+      <p>These make something new rather than keeping something you found.</p>
+      <table class="keytable">
+        <tr>
+          <td>Drop in a screenshot
+          <span class="why">Ctrl+Cmd+Shift+4 to snip. That Ctrl is what puts it on the clipboard instead of your desktop.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">V</span></span></td>
+        </tr>
+        <tr>
+          <td>Start or stop a voice memo</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">M</span></span></td>
+        </tr>
+        <tr>
+          <td>Open a whiteboard and draw</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">D</span></span></td>
+        </tr>
+        <tr>
+          <td>Type a quick note from anywhere
+          <span class="why">Not Cmd+Shift+Q. That one logs you out.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">J</span></span></td>
+        </tr>
+        <tr>
+          <td>Start a new paragraph</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">N</span></span></td>
+        </tr>
+        <tr>
+          <td>Undo the last capture</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">Z</span></span></td>
+        </tr>
+        <tr>
+          <td>Redo it</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">Y</span></span></td>
+        </tr>
+      </table>
 
-    <table class="keytable">
-      <caption>Explain a selection</caption>
-      <tr>
-        <td>Explain what I highlighted
-          <span class="why">Tap Cmd twice, quickly, without holding it. Needs Input Monitoring.</span>
-        </td>
-        <td>Cmd, Cmd</td>
-      </tr>
-      <tr><td>Same thing, and this one only needs Accessibility</td><td>Cmd+Shift+E</td></tr>
-    </table>
+      <h3 class="keygroup">Explain a selection</h3>
+      <p>Highlight first. No need to copy anything for this one.</p>
+      <table class="keytable">
+        <tr>
+          <td>Explain what I highlighted
+          <span class="why">Two taps, quickly, without holding it down. Needs Input Monitoring.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep sep-tap">,</span><span class="cap">Cmd</span></span></td>
+        </tr>
+        <tr>
+          <td>The same thing, and this one only needs Accessibility</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">E</span></span></td>
+        </tr>
+      </table>
 
-    <table class="keytable">
-      <caption>Inside the whiteboard</caption>
-      <tr><td>Undo a stroke</td><td>Cmd+Z</td></tr>
-      <tr><td>Put it back</td><td>Cmd+Y or Cmd+Shift+Z</td></tr>
-      <tr><td>Close without saving</td><td>Esc</td></tr>
-    </table>
+      <h3 class="keygroup">Inside the whiteboard</h3>
+      <p>Only while the board is open and in front of you.</p>
+      <table class="keytable">
+        <tr>
+          <td>Undo a stroke</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Z</span></span></td>
+        </tr>
+        <tr>
+          <td>Put it back</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Y</span></span></td>
+        </tr>
+        <tr>
+          <td>Close without saving</td>
+          <td><span class="combo combo-lead"><span class="cap">Esc</span></span></td>
+        </tr>
+      </table>
+      <!--/KEYS-->
 
     <h2 id="explain">The explain thing</h2>
 
@@ -179,14 +224,14 @@
       <dt>It says Casrion cannot be opened.</dt>
       <dd>Right click it in Applications and choose <b>Open</b>, then <b>Open</b> again. Double clicking will not do it. If it still refuses, <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.</dd>
 
-      <dt>Explain comes up with nothing selected, but I selected something.</dt>
+      <dt>Explain says nothing is selected, but I selected something.</dt>
       <dd>Accessibility is off, or it is on for an older copy of the app. Turn it on, then quit Casrion from the menu bar and reopen it. A few apps also genuinely keep their selection to themselves, and Casrion will say so when that is what happened.</dd>
 
       <dt>Double-tapping Cmd does nothing.</dt>
-      <dd>That is Input Monitoring, which is a separate switch from Accessibility. Same pane, one row down. <kbd>Cmd+Shift+E</kbd> works without it.</dd>
+      <dd>That is Input Monitoring, which is a separate switch from Accessibility. Same pane, one row down. <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> works without it.</dd>
 
       <dt>The explain popup will not go away when I click somewhere.</dt>
-      <dd>Same switch. Noticing a click outside its own window is exactly the thing Input Monitoring governs. Turn it on and quit and reopen, or just use the popup's own close button in the meantime. Recent builds spot this and offer you the settings pane from inside the popup.</dd>
+      <dd>Same switch. Noticing a click outside its own window is exactly the thing Input Monitoring governs. Turn it on, then quit and reopen. Casrion spots this happening and offers you the settings pane from inside the popup.</dd>
 
       <dt>I updated and a permission stopped working.</dt>
       <dd>macOS ties permissions to the exact copy of the app, so the checkmarks can go stale while still looking switched on. Select Casrion in <b>Accessibility</b> and <b>Input Monitoring</b>, remove it with <b>&minus;</b>, add it back with <b>+</b>, then quit and reopen.</dd>
