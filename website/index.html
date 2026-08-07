@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casrion</title>
+  <meta name="description" content="Casrion turns anything you copy into a finished Markdown note on one keypress, without pulling you out of what you were reading. Offline, free, no account.">
+  <link rel="icon" type="image/png" href="./favicon-32.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <main class="reading">
+
+    <header class="top">
+      <span class="wordmark">
+        <img src="./logo-64.png" alt="" width="24" height="24">
+        Casrion
+      </span>
+      <a class="top-get" href="#get">Download</a>
+    </header>
+
+    <h1>Notes, minus the part where you stop to take them.</h1>
+
+    <p class="lede">
+      The moment worth keeping and the moment you have time to write it down
+      are never the same one. So Casrion puts the whole detour on one key. You
+      copy the line, you press it, you keep reading.
+    </p>
+
+    <h2 id="shape">The key decides the shape</h2>
+
+    <p>
+      A capture that lands as a wall of text is barely better than the
+      clipboard, so the key you press picks how it arrives. On the left is what
+      was on your screen. On the right is exactly what your note file gained,
+      character for character.
+    </p>
+
+    <div class="becomes">
+      <div class="from">Diffusion models learn to reverse a gradual noising process.</div>
+      <div class="via"><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="cap">Shift</span><span class="cap">C</span></span></div>
+      <div class="to">Diffusion models learn to reverse a gradual noising process.</div>
+    </div>
+
+    <div class="becomes">
+      <div class="from">How diffusion models work</div>
+      <div class="via"><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="cap">Shift</span><span class="cap">2</span></span></div>
+      <div class="to"><span class="md">## </span>How diffusion models work</div>
+    </div>
+
+    <div class="becomes">
+      <div class="from">model.add_noise(x, t)</div>
+      <div class="via"><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="cap">Shift</span><span class="cap">K</span></span></div>
+      <div class="to"><span class="md">```</span>
+model.add_noise(x, t)
+<span class="md">```</span></div>
+    </div>
+
+    <p class="caption">
+      Plain Markdown, in a file you chose, on a disk you own. Nothing you can
+      only open again by opening this.
+    </p>
+
+    <ul class="keylist">
+      <li><span>Keep it as it is</span><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">C</span></span></li>
+      <li><span>Keep it as a heading</span><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">1</span></span></li>
+      <li><span>Keep it as code</span><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">K</span></span></li>
+      <li><span>Drop in a screenshot</span><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">V</span></span></li>
+      <li><span>Undo the last one</span><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">Z</span></span></li>
+    </ul>
+
+    <p class="footnote">
+      Twenty of them altogether, and the rest are on your platform's page.
+      Voice memos, a whiteboard, a writer that floats over everything. On a Mac
+      it is Cmd, with three exceptions macOS keeps for itself.
+    </p>
+
+    <h2 id="source">It remembers where you got it</h2>
+
+    <p>
+      A quote with no source is half a note. Every capture can carry the page it
+      came from, the app, and the time, written into the file underneath it
+      rather than into a database you would have to keep.
+    </p>
+
+    <div class="becomes">
+      <div class="from">Reversing the noise is what turns sampling into generation.</div>
+      <div class="via"><span class="combo combo-lead"><span class="cap">Ctrl</span><span class="cap">Shift</span><span class="cap">C</span></span></div>
+      <div class="to">Reversing the noise is what turns sampling into generation.
+<span class="src">&lt;sub&gt;arxiv.org/abs/2006.11239 &middot; 4:12 pm&lt;/sub&gt;</span></div>
+    </div>
+
+    <h2 id="explain">And it explains what you don't know</h2>
+
+    <p>
+      Sometimes the problem is not keeping the sentence, it is that the sentence
+      means nothing to you yet. Select it, tap <kbd>Ctrl</kbd> twice, and a
+      small window explains it where you are standing. It reads the screen
+      around your selection first, so it knows a stray symbol belongs to the
+      formula three lines up.
+    </p>
+
+    <p>
+      That is a language model sitting on your own disk. Nothing is sent
+      anywhere. It stays unloaded until you look like you need it and hands the
+      memory back five minutes after you stop.
+    </p>
+
+    <h2 id="draw">Some things are a diagram</h2>
+
+    <p>
+      Not everything wants to be a sentence. Hit the whiteboard key anywhere,
+      draw the thing, and it drops into the note as an ordinary
+      <code>.svg</code> that opens in any browser with or without this app.
+      Double-click it later and the markers are still there.
+    </p>
+
+    <h2 id="private">Nothing leaves your machine</h2>
+
+    <p>
+      Casrion makes no network requests. Not fewer than most. None. Delete it
+      tomorrow and every note you made is still sitting there, readable in
+      Notepad.
+    </p>
+
+    <table class="spec">
+      <tr><th>Runs on</th><td>Windows 10 and 11, macOS 11+ on Apple Silicon</td></tr>
+      <tr><th>Your notes</th><td>plain Markdown, in folders you pick</td></tr>
+      <tr><th>Idle memory</th><td>about 450 MB</td></tr>
+      <tr><th>Network, account, telemetry</th><td>none, none, none</td></tr>
+      <tr><th>Price</th><td>free</td></tr>
+    </table>
+
+    <h2 id="get">Go get it</h2>
+
+    <p>
+      Pick your side. Each one has its own keys, its own two minutes of setup,
+      and its own list of things that might go wrong.
+    </p>
+
+    <div class="doors">
+      <a class="door" href="/windows">
+        <span class="door-name">Windows<span class="door-os">10 and 11</span></span>
+        <span class="door-go">Keys and setup</span>
+        <span class="door-sub">One installer, and one blue box to click past.</span>
+      </a>
+      <a class="door" href="/mac">
+        <span class="door-name">macOS<span class="door-os">11 and later, Apple Silicon</span></span>
+        <span class="door-go">Keys and setup</span>
+        <span class="door-sub">A .dmg, and a few switches macOS wants flipped.</span>
+      </a>
+    </div>
+
+    <p class="footnote">
+      No email, no sign up, no trial that expires. It is one person's app and it
+      is free.
+    </p>
+
+    <footer class="colophon">
+      <p>
+        Staying offline on purpose. The source is
+        <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>
+        if you read that sort of thing for fun. Stuck on something?
+        <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
+      </p>
+      <p class="sign">Go keep something.</p>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>

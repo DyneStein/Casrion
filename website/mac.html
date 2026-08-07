@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casrion for Mac</title>
+  <meta name="description" content="Casrion on macOS 11+ and Apple Silicon. Every shortcut, the permissions macOS wants, and what to do when one of them goes quiet.">
+  <link rel="icon" type="image/png" href="./favicon-32.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <main class="reading">
+
+    <header class="top">
+      <span class="wordmark">
+        <img src="./logo-64.png" alt="" width="24" height="24">
+        Casrion
+      </span>
+      <a class="top-get" href="/windows">On Windows?</a>
+    </header>
+
+    <a class="crumb" href="/">Back</a>
+
+    <h1>Casrion, on a Mac.</h1>
+
+    <p class="os-line">For <b>macOS 11 and later</b>, Apple Silicon.</p>
+
+    <p class="lede">
+      Two minutes of flipping switches, because macOS wants to be asked before
+      an app can read what you highlighted. Then it lives in your menu bar and
+      gets out of the way.
+    </p>
+
+    <p class="grab">
+      <a class="btn" href="/get-mac">Download for Mac</a>
+      <span class="grab-meta">Free, no email, no account.<br>Apple Silicon only, for now.</span>
+    </p>
+
+    <h2 id="install">Getting it open</h2>
+
+    <p>
+      Apple charges for a signature the same way Microsoft does, so macOS treats
+      Casrion as a stranger exactly once. Here is the whole dance.
+    </p>
+
+    <ol class="setup">
+      <li>
+        <h3>Drag it into Applications</h3>
+        <p>Straight out of the <code>.dmg</code>, like anything else.</p>
+      </li>
+      <li>
+        <h3>Right click it, choose Open</h3>
+        <p>
+          Then <b>Open</b> again in the dialog. Double clicking will not work the
+          first time, and that is deliberate on Apple's part.
+          <span class="more">Still refusing? Run <code>xattr -cr /Applications/Casrion.app</code> in Terminal once, then open it normally.</span>
+        </p>
+      </li>
+      <li>
+        <h3>Turn on Accessibility</h3>
+        <p>
+          <b>System Settings &rarr; Privacy &amp; Security &rarr; Accessibility</b>.
+          This is what lets Casrion read the text you highlighted in another app.
+          Without it, explain comes up empty. Casrion opens that pane for you the
+          first time you ask it to explain something.
+        </p>
+      </li>
+      <li>
+        <h3>Turn on Input Monitoring</h3>
+        <p>
+          Same place, one row down. macOS guards raw key and mouse taps
+          separately from the switch above, which catches people out. This is
+          what makes the double-tap gesture fire, and what lets the explain
+          popup notice you clicking away from it.
+          <span class="more">Skip it and everything else still works. You just use <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> and close the popup with its own button.</span>
+        </p>
+      </li>
+      <li>
+        <h3>Quit and reopen, properly</h3>
+        <p>
+          From the menu bar icon, not by closing the window. macOS only applies
+          those switches to a fresh launch. The microphone and browser questions
+          show up on their own when you first need them; click <b>Allow</b>.
+        </p>
+      </li>
+    </ol>
+
+    <h2 id="keys">Every key</h2>
+
+    <p>
+      Mostly Cmd where Windows uses Ctrl. Three are not, because macOS keeps
+      those combinations for itself and will not give them up. Those say so on
+      the line. Inside the app,
+      <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>H</kbd> puts this list on screen
+      whenever you want it.
+    </p>
+
+    <!--KEYS-->
+      <h3 class="keygroup">Copy something first, then press</h3>
+      <p>Anything you can select and copy, in any app you have open.</p>
+      <table class="keytable">
+        <tr>
+          <td>Keep it as it is</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">C</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it as a big heading</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">1</span></span></td>
+        </tr>
+        <tr>
+          <td>Medium heading</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">2</span></span></td>
+        </tr>
+        <tr>
+          <td>Small heading
+          <span class="why">Not Cmd+Shift+3. macOS takes a screenshot with that one.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">3</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it as code</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">K</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it bold</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">B</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it italic</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">I</span></span></td>
+        </tr>
+        <tr>
+          <td>Keep it red, green or blue
+          <span class="why">Not Option+R/G/B. On a Mac those type &reg; &#729; &int;.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Ctrl</span><span class="sep">+</span><span class="cap">R</span><span class="sep">/</span><span class="cap">G</span><span class="sep">/</span><span class="cap">B</span></span></td>
+        </tr>
+      </table>
+
+      <h3 class="keygroup">Nothing to copy</h3>
+      <p>These make something new rather than keeping something you found.</p>
+      <table class="keytable">
+        <tr>
+          <td>Drop in a screenshot
+          <span class="why">Ctrl+Cmd+Shift+4 to snip. That Ctrl is what puts it on the clipboard instead of your desktop.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">V</span></span></td>
+        </tr>
+        <tr>
+          <td>Start or stop a voice memo</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">M</span></span></td>
+        </tr>
+        <tr>
+          <td>Open a whiteboard and draw</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">D</span></span></td>
+        </tr>
+        <tr>
+          <td>Type a quick note from anywhere
+          <span class="why">Not Cmd+Shift+Q. That one logs you out.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">J</span></span></td>
+        </tr>
+        <tr>
+          <td>Start a new paragraph</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">N</span></span></td>
+        </tr>
+        <tr>
+          <td>Undo the last capture</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">Z</span></span></td>
+        </tr>
+        <tr>
+          <td>Redo it</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">Y</span></span></td>
+        </tr>
+      </table>
+
+      <h3 class="keygroup">Explain a selection</h3>
+      <p>Highlight first. No need to copy anything for this one.</p>
+      <table class="keytable">
+        <tr>
+          <td>Explain what I highlighted
+          <span class="why">Two taps, quickly, without holding it down. Needs Input Monitoring.</span></td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep sep-tap">,</span><span class="cap">Cmd</span></span></td>
+        </tr>
+        <tr>
+          <td>The same thing, and this one only needs Accessibility</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Shift</span><span class="sep">+</span><span class="cap">E</span></span></td>
+        </tr>
+      </table>
+
+      <h3 class="keygroup">Inside the whiteboard</h3>
+      <p>Only while the board is open and in front of you.</p>
+      <table class="keytable">
+        <tr>
+          <td>Undo a stroke</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Z</span></span></td>
+        </tr>
+        <tr>
+          <td>Put it back</td>
+          <td><span class="combo combo-lead"><span class="cap">Cmd</span><span class="sep">+</span><span class="cap">Y</span></span></td>
+        </tr>
+        <tr>
+          <td>Close without saving</td>
+          <td><span class="combo combo-lead"><span class="cap">Esc</span></span></td>
+        </tr>
+      </table>
+      <!--/KEYS-->
+
+    <h2 id="explain">The explain thing</h2>
+
+    <p>
+      Highlight anything, anywhere, tap <kbd>Cmd</kbd> twice, and a small window
+      tells you what it says. It reads the screen around your selection first, so
+      it knows a loose symbol belongs to the formula three lines up.
+    </p>
+
+    <p>
+      The first time you use it, it downloads a small model, once. After that it
+      works on a plane. Nothing you highlight is ever sent anywhere, because
+      there is nowhere for it to be sent to.
+    </p>
+
+    <h2 id="questions">When something acts up</h2>
+
+    <dl class="qa">
+      <dt>It says Casrion cannot be opened.</dt>
+      <dd>Right click it in Applications and choose <b>Open</b>, then <b>Open</b> again. Double clicking will not do it. If it still refuses, <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.</dd>
+
+      <dt>Explain says nothing is selected, but I selected something.</dt>
+      <dd>Accessibility is off, or it is on for an older copy of the app. Turn it on, then quit Casrion from the menu bar and reopen it. A few apps also genuinely keep their selection to themselves, and Casrion will say so when that is what happened.</dd>
+
+      <dt>Double-tapping Cmd does nothing.</dt>
+      <dd>That is Input Monitoring, which is a separate switch from Accessibility. Same pane, one row down. <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> works without it.</dd>
+
+      <dt>The explain popup will not go away when I click somewhere.</dt>
+      <dd>Same switch. Noticing a click outside its own window is exactly the thing Input Monitoring governs. Turn it on, then quit and reopen. Casrion spots this happening and offers you the settings pane from inside the popup.</dd>
+
+      <dt>I updated and a permission stopped working.</dt>
+      <dd>macOS ties permissions to the exact copy of the app, so the checkmarks can go stale while still looking switched on. Select Casrion in <b>Accessibility</b> and <b>Input Monitoring</b>, remove it with <b>&minus;</b>, add it back with <b>+</b>, then quit and reopen.</dd>
+
+      <dt>Where do my notes live?</dt>
+      <dd>Markdown files in folders you picked, with screenshots, voice memos and whiteboards in an <code>assets</code> folder beside them. Nothing is in a database. They are just files.</dd>
+
+      <dt>Intel Mac?</dt>
+      <dd>Not yet. The build is Apple Silicon only for now.</dd>
+    </dl>
+
+    <footer class="colophon">
+      <p>
+        Source is <a href="https://github.com/DyneStein/Casrion" target="_blank" rel="noopener">on GitHub</a>.
+        Something broken? <a href="mailto:hello@casrion.com">hello@casrion.com</a>.
+      </p>
+      <p class="sign">Go keep something.</p>
+    </footer>
+
+  </main>
+</div>
+
+</body>
+</html>
