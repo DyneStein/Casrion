@@ -18,9 +18,6 @@ electron-obf
 tmp
 .claude
 
-# the website lives in its own repo (DyneStein/Casrion)
-website
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
