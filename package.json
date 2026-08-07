@@ -2,10 +2,29 @@
   "name": "casrion",
   "productName": "Casrion",
   "version": "1.0.0",
-  "description": "Casrion",
+  "description": "Take notes without leaving what you are reading. A tray app that captures selected text, screenshots, voice memos and drawings into plain Markdown, with a local AI that explains anything you highlight.",
   "author": {
-    "name": "Casrion"
+    "name": "DyneStein"
   },
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://casrion.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DyneStein/Casrion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DyneStein/Casrion/issues"
+  },
+  "keywords": [
+    "notes",
+    "markdown",
+    "electron",
+    "note-taking",
+    "screenshot",
+    "local-ai",
+    "offline",
+    "productivity"
+  ],
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
