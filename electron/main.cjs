@@ -88,7 +88,7 @@ function performUndo() {
   redoStack.push({ filePath: activeFilePath, content: readFileContent(activeFilePath), insertionLine });
   capSnapshotStack(redoStack);
   showOverlayNotification('Undo complete', 'text');
-  fs.writeFileSync(top.filePath, top.content, 'utf-8');
+  writeFileAtomic(top.filePath, top.content, 'utf-8');
   insertionLine = top.insertionLine;
   // The undone capture may have carried a source stamp — forget the dedupe
   // state so the next capture stamps again instead of assuming one exists.
@@ -112,7 +112,7 @@ function performRedo() {
   undoStack.push({ filePath: activeFilePath, content: readFileContent(activeFilePath), insertionLine });
   capSnapshotStack(undoStack);
   showOverlayNotification('Redo complete', 'text');
-  fs.writeFileSync(top.filePath, top.content, 'utf-8');
+  writeFileAtomic(top.filePath, top.content, 'utf-8');
   insertionLine = top.insertionLine;
   lastStamp = { title: null, file: null };
   console.log('[Casrion] Redo performed, stack size:', redoStack.length);
@@ -120,6 +120,35 @@ function performRedo() {
 }
 
 // ─── Settings Persistence ─────────────────────────────────
+/**
+ * Write a file so that it is never observed half written.
+ *
+ * fs.writeFileSync truncates the target and then streams into it, so a crash,
+ * a power cut or a battery dying anywhere in the middle leaves a note that is
+ * cut in half, and the second half is gone. That is the one failure this app
+ * must not have: the whole promise is that the notes are plain files that
+ * outlive it. Writing beside the target and renaming over it makes the swap
+ * atomic on both NTFS and APFS, so a reader sees either the old file or the
+ * new one and never a torn one.
+ *
+ * The fallback matters on Windows: if something else holds the destination
+ * open (an editor with the note open, antivirus mid-scan) the rename can fail
+ * where a plain write would have worked, and refusing to save would be worse
+ * than saving non-atomically. So try for atomic, settle for written.
+ */
+function writeFileAtomic(filePath, data, encoding) {
+  const tmp = path.join(path.dirname(filePath), `.${path.basename(filePath)}.casrion-tmp`);
+  try {
+    fs.writeFileSync(tmp, data, encoding);
+    fs.renameSync(tmp, filePath);
+    return;
+  } catch (e) {
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch { /* leave the stray temp */ }
+    console.warn('[Casrion] Atomic write fell back to a direct write:', e.message);
+  }
+  fs.writeFileSync(filePath, data, encoding);
+}
+
 function loadSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
@@ -129,6 +158,15 @@ function loadSettings() {
     }
   } catch (e) {
     console.error('[Casrion] Failed to load settings:', e.message);
+    // Falling back to defaults is right, but the next saveSettings would then
+    // write those defaults straight over the unreadable file and take the
+    // user's folder list with it. Keep the wreckage: it is the only copy of
+    // where their notes live, and it is usually recoverable by hand.
+    try {
+      const kept = settingsPath.replace(/\.json$/, '') + `.corrupt-${Date.now()}.json`;
+      fs.renameSync(settingsPath, kept);
+      console.error('[Casrion] Kept the unreadable settings file at', kept);
+    } catch { /* it may not even exist any more */ }
     settings = {};
   }
   
@@ -146,7 +184,7 @@ function loadSettings() {
 
 function saveSettings() {
   try {
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    writeFileAtomic(settingsPath, JSON.stringify(settings, null, 2));
   } catch (e) {
     console.error('[Casrion] Failed to save settings:', e.message);
   }
@@ -241,7 +279,7 @@ function readFileContent(filePath) {
       );
 
       if (content !== originalContent) {
-        fs.writeFileSync(filePath, content, 'utf-8');
+        writeFileAtomic(filePath, content, 'utf-8');
         console.log(`[Casrion] Auto-migrated legacy paths in ${filePath}`);
       }
       
@@ -280,7 +318,7 @@ function appendToLine(text, lineNum) {
     // separator: without it, markdown reads plain text under a list or
     // quote line as a lazy continuation and merges it into that block.
     lines.splice(lineNum + 1, 0, '', ...textLines);
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lineNum + 1 + textLines.length;
   }
 
@@ -291,20 +329,20 @@ function appendToLine(text, lineNum) {
       // Last line has content, append to it (check if it's structural too)
       if (smartRegex.test(lines[currentLast])) {
         lines.push('', ...textLines);
-        fs.writeFileSync(activeFilePath, lines.join('\n'));
+        writeFileAtomic(activeFilePath, lines.join('\n'));
         return lines.length - 1;
       } else {
         lines[currentLast] = lines[currentLast] + ' ' + firstTextLine;
         if (restTextLines.length > 0) {
           lines.push(...restTextLines);
         }
-        fs.writeFileSync(activeFilePath, lines.join('\n'));
+        writeFileAtomic(activeFilePath, lines.join('\n'));
         return lines.length - 1;
       }
     } else {
       // Last line is empty, put text there
       lines.splice(currentLast, 1, ...textLines);
-      fs.writeFileSync(activeFilePath, lines.join('\n'));
+      writeFileAtomic(activeFilePath, lines.join('\n'));
       return currentLast + textLines.length - 1;
     }
   } else {
@@ -317,7 +355,7 @@ function appendToLine(text, lineNum) {
     if (restTextLines.length > 0) {
       lines.splice(lineNum + 1, 0, ...restTextLines);
     }
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lineNum + restTextLines.length;
   }
 }
@@ -344,7 +382,7 @@ function insertNewLineAfter(text, lineNum) {
     } else {
       lines.push('', ...textLines);
     }
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lines.length - 1;
   }
 
@@ -353,13 +391,13 @@ function insertNewLineAfter(text, lineNum) {
     // Ctrl+Shift+N): write into it, keeping one separator from text above.
     const sep = lineNum > 0 && lines[lineNum - 1].trim() !== '' ? [''] : [];
     lines.splice(lineNum, 1, ...sep, ...textLines);
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lineNum + sep.length + textLines.length - 1;
   }
 
   // Insert after the specified line with one separating blank line
   lines.splice(lineNum + 1, 0, '', ...textLines);
-  fs.writeFileSync(activeFilePath, lines.join('\n'));
+  writeFileAtomic(activeFilePath, lines.join('\n'));
   return lineNum + 1 + textLines.length; // the new line's index
 }
 
@@ -370,11 +408,11 @@ function insertBlankLine(lineNum) {
 
   if (lineNum < 0 || lineNum >= lines.length) {
     lines.push('');
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lines.length - 1;
   } else {
     lines.splice(lineNum + 1, 0, '');
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     return lineNum + 1;
   }
 }
@@ -1475,14 +1513,35 @@ function clipboardHasImage() {
   return clipboardFormats().some((f) => f.startsWith('image/'));
 }
 
+// The text of the last capture that went in. See clipboardTextSnapshot.
+let lastCapturedText = null;
+
 // Formats and text together, retried while the pair looks like a failed read:
 // no formats at all, or formats that promise text which reads back empty.
-function clipboardTextSnapshot() {
+//
+// `suspectStale` closes a hole those two checks cannot see. Copying is not
+// instant: the source app writes the clipboard a beat after the key goes down,
+// and Chromium-based apps are the slowest at it. Press Ctrl+C and Ctrl+Shift+C
+// quickly enough and the read lands in that gap, where the clipboard still
+// holds the PREVIOUS copy. That reads back as perfectly valid non-empty text,
+// so every check above is satisfied and the wrong paragraph gets kept, quietly,
+// with a toast saying it worked.
+//
+// There is no clipboard sequence number available to us (Electron does not
+// expose one and neither does the hook), but the rhythm gives one away: it is
+// copy, capture, copy, capture, so the stale value is almost always the text
+// that was captured last time. Treat that as "the copy has not landed yet" and
+// give it the same short grace an empty read already gets. It is verified,
+// never trusted: if it still reads the same after the retries it goes in
+// anyway, because the user is allowed to keep the same thing twice.
+function clipboardTextSnapshot(suspectStale) {
   for (let i = 0; ; i++) {
     const formats = clipboard.availableFormats();
     const text = clipboard.readText();
     const claimsText = formats.some((f) => f.startsWith('text/'));
-    if ((formats.length && (text || !claimsText)) || i >= CLIP_RETRIES) return { formats, text };
+    const looksRead = formats.length && (text || !claimsText);
+    const looksStale = suspectStale != null && text !== '' && text === suspectStale;
+    if ((looksRead && !looksStale) || i >= CLIP_RETRIES) return { formats, text };
     waitSync(CLIP_RETRY_MS);
   }
 }
@@ -1508,7 +1567,7 @@ function preflightText(mode) {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  const { formats, text: rawText } = clipboardTextSnapshot();
+  const { formats, text: rawText } = clipboardTextSnapshot(lastCapturedText);
   const hasHtml = formats.includes('text/html');
 
   if (WRAPPER_MODES[mode]) {
@@ -1520,6 +1579,7 @@ function preflightText(mode) {
       return null;
     }
     showOverlayNotification(snippet.substring(0, 30) + (snippet.length > 30 ? '...' : ''), 'text');
+    lastCapturedText = rawText;
     return { rawText, hasHtml, snippet };
   }
 
@@ -1534,6 +1594,9 @@ function preflightText(mode) {
       : 'Captured',
     mode === 'append' ? 'text' : 'heading'
   );
+  // Only on the paths that actually keep something, so a rejected capture
+  // never poisons the staleness signal for the next one.
+  lastCapturedText = rawText;
   return { rawText, hasHtml };
 }
 
@@ -1689,12 +1752,12 @@ async function captureCodeBlock(pendingStamp = null, pre = null) {
   if (lineNum < 0 || lineNum >= lines.length) {
     const codeLines = codeBlock.split('\n');
     lines.push('', ...codeLines);
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     insertionLine = lines.length - 1;
   } else {
     const codeLines = codeBlock.split('\n');
     lines.splice(lineNum + 1, 0, '', ...codeLines);
-    fs.writeFileSync(activeFilePath, lines.join('\n'));
+    writeFileAtomic(activeFilePath, lines.join('\n'));
     insertionLine = lineNum + 1 + codeLines.length;
   }
 
@@ -1977,7 +2040,7 @@ function registerIPC() {
         if (rel.startsWith('..') || path.isAbsolute(rel) || !/^board-\d+\.svg$/i.test(path.basename(target))) {
           return { error: 'That board path is not one of ours' };
         }
-        fs.writeFileSync(target, svg, 'utf8');
+        writeFileAtomic(target, svg, 'utf8');
         console.log('[Casrion] Board updated:', path.basename(target));
         // The note's text is unchanged, so nothing would re-render the image.
         // Tell the window to pull the new file in.
@@ -2106,7 +2169,7 @@ function registerIPC() {
     content = content.replace(mdRegex, `](assets/`);
     content = content.replace(htmlRegex, `src="assets/`);
     
-    fs.writeFileSync(activeFilePath, content);
+    writeFileAtomic(activeFilePath, content);
     console.log('[Casrion] File saved:', activeFilePath);
     return { success: true };
   });
