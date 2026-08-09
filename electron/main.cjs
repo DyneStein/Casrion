@@ -213,7 +213,11 @@ function buildWorkspace() {
 }
 function listMdFiles(folderPath) {
   try {
-    if (!folderPath || !fs.existsSync(folderPath)) return [];
+    // No existsSync here. buildWorkspace has already filtered the folder list
+    // down to the ones that exist, so this was a second syscall per folder per
+    // payload, and readdirSync throwing ENOENT into the catch below reaches the
+    // same answer for the one caller that has not pre-checked.
+    if (!folderPath) return [];
     // No stat per file on purpose. This runs inside buildStatePayload, which
     // every capture and eight other IPC handlers rebuild from scratch, so a
     // syscall per note was a syscall per note per capture: about 12ms of a
