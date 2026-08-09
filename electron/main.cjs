@@ -15,6 +15,7 @@ const { spawn } = require('child_process');
 const { normalizeCapture, stripColorMarkup } = require('./capture-normalize.cjs');
 const { patchWebmDuration } = require('./webm-duration.cjs');
 const explainFeature = require('./explain.cjs');
+const pasteboardMac = require('./pasteboard-mac.cjs');
 
 // Build integrity tag — do not remove.
 const APP_MARK = 'Q2FzcmlvbiDigJQgb3JpZ2luYWwgd29yayBvZiBEeWVuIMK3IG1keWVuYXNpZkBnbWFpbC5jb20gwrcgZXN0LiAyMDI2';
@@ -1545,6 +1546,33 @@ const WRAPPER_MODES = {
 const CLIP_RETRIES = 5;
 const CLIP_RETRY_MS = 30;
 
+// Waiting out a copy that has not landed yet is a different problem from the
+// Windows clipboard-lock retry above, and it needs its own budget. Measured on
+// Safari, a rich text copy landed 132ms after the capture had already read the
+// pasteboard, which 5 x 30ms could never cover. The finer interval also means
+// the loop returns the moment the copy lands instead of at the next 30ms
+// boundary, so the common case gets slower by nothing.
+//
+// Windows keeps the old numbers deliberately. It has no sequence number, so
+// its only staleness signal is the text heuristic, and a longer blocking wait
+// there would be paid on guesses rather than on facts.
+// The budget is a cap, not a cost. Because the counter says exactly when the
+// copy lands, the loop returns the moment it does, so a normal capture pays
+// nothing at all and a racing one pays only the real write latency.
+//
+// The full 500ms is only ever paid in one case: pressing capture again without
+// copying anything new, where there is genuinely nothing to wait for and no way
+// to tell that apart from a copy still in flight. That was 150ms before, so a
+// deliberate double capture of the same text got slower. Correctness of what
+// lands in the note was judged the more important half of that trade.
+const IS_MAC = process.platform === 'darwin';
+const STALE_RETRIES = IS_MAC ? 50 : CLIP_RETRIES;
+const STALE_RETRY_MS = IS_MAC ? 10 : CLIP_RETRY_MS;
+
+// The pasteboard sequence number as of the last capture that kept something.
+// null means "no reading yet", which reads as "cannot tell" everywhere below.
+let changeCountAtLastCapture = null;
+
 // Deliberately blocking: these run inside the hotkey handler, where the whole
 // point is to read the clipboard as it was when the key went down. The wait
 // only ever happens on a failed read (max ~150ms), never on the happy path.
@@ -1593,15 +1621,61 @@ let lastCapturedText = null;
 // give it the same short grace an empty read already gets. It is verified,
 // never trusted: if it still reads the same after the retries it goes in
 // anyway, because the user is allowed to keep the same thing twice.
+// On macOS the guesswork above is replaced by a fact. See pasteboard-mac.cjs:
+// NSPasteboard keeps a counter that the system bumps on every write by anyone,
+// so "has a new copy landed since the last capture" is a comparison of two
+// integers rather than an inference from the text.
+//
+// That closes the hole the text heuristic cannot see. Copy something and never
+// capture it, then copy something else and capture quickly, and the stale read
+// matches nothing the old guard knew about, so it returned the wrong paragraph
+// without retrying once. Measured on Safari: the capture read 132ms before the
+// copy landed and kept a URL from ten minutes earlier.
+//
+// It also makes capturing the same text twice on purpose FASTER than before,
+// not slower. Two presses of Cmd+C bump the counter even though the text is
+// identical, so the second capture is recognised as fresh immediately, where
+// the text heuristic used to sit out its whole retry budget first.
+//
+// The counter is only ever used when it can be trusted. If the helper is not
+// running, or the file it writes cannot be parsed, readSync returns null and
+// this falls back to exactly the 1.0.1 behaviour, which is also what Windows
+// always gets.
 function clipboardTextSnapshot(suspectStale) {
   for (let i = 0; ; i++) {
     const formats = clipboard.availableFormats();
     const text = clipboard.readText();
     const claimsText = formats.some((f) => f.startsWith('text/'));
     const looksRead = formats.length && (text || !claimsText);
-    const looksStale = suspectStale != null && text !== '' && text === suspectStale;
-    if ((looksRead && !looksStale) || i >= CLIP_RETRIES) return { formats, text };
-    waitSync(CLIP_RETRY_MS);
+
+    const count = pasteboardMac.readSync();
+    const looksStale = (count !== null && changeCountAtLastCapture !== null)
+      // The pasteboard has not been written since the last capture kept
+      // something, so whatever is sitting there is the previous copy.
+      ? count === changeCountAtLastCapture
+      : (suspectStale != null && text !== '' && text === suspectStale);
+
+    if ((looksRead && !looksStale) || i >= STALE_RETRIES) return { formats, text, count };
+    waitSync(STALE_RETRY_MS);
+  }
+}
+
+// Screenshot capture races exactly the way text capture does: take a shot,
+// press paste too quickly, and the previous image is still what is sitting on
+// the pasteboard. Until now nothing guarded that at all, because the text
+// heuristic had nothing to compare a bitmap against. The counter does not care
+// what kind of data it is.
+//
+// Blocks only while the pasteboard genuinely has not moved since the last
+// capture, and returns the instant it does. Off macOS, and whenever the helper
+// is not answering, readSync returns null and this is a no-op on the first
+// iteration, so Windows behaviour is untouched.
+function waitForFreshPasteboard() {
+  if (changeCountAtLastCapture === null) return pasteboardMac.readSync();
+  for (let i = 0; ; i++) {
+    const count = pasteboardMac.readSync();
+    if (count === null || count !== changeCountAtLastCapture || i >= STALE_RETRIES) return count;
+    waitSync(STALE_RETRY_MS);
   }
 }
 
@@ -1626,7 +1700,7 @@ function preflightText(mode) {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  const { formats, text: rawText } = clipboardTextSnapshot(lastCapturedText);
+  const { formats, text: rawText, count } = clipboardTextSnapshot(lastCapturedText);
   const hasHtml = formats.includes('text/html');
 
   if (WRAPPER_MODES[mode]) {
@@ -1639,6 +1713,7 @@ function preflightText(mode) {
     }
     showOverlayNotification(snippet.substring(0, 30) + (snippet.length > 30 ? '...' : ''), 'text');
     lastCapturedText = rawText;
+    changeCountAtLastCapture = count;
     return { rawText, hasHtml, snippet };
   }
 
@@ -1656,6 +1731,7 @@ function preflightText(mode) {
   // Only on the paths that actually keep something, so a rejected capture
   // never poisons the staleness signal for the next one.
   lastCapturedText = rawText;
+  changeCountAtLastCapture = count;
   return { rawText, hasHtml };
 }
 
@@ -1707,6 +1783,7 @@ function preflightImage() {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
+  const count = waitForFreshPasteboard();
   if (!clipboardHasImage()) {
     showOverlayNotification(`No image in clipboard. ${SCREENSHOT_HINT}`, 'error');
     return null;
@@ -1719,6 +1796,7 @@ function preflightImage() {
     showOverlayNotification('Could not read that image. Copy it again', 'error');
     return null;
   }
+  changeCountAtLastCapture = count;
   return { image };
 }
 
@@ -1790,12 +1868,13 @@ function preflightCode() {
     showOverlayNotification('No file selected!', 'error');
     return null;
   }
-  const { text } = clipboardTextSnapshot();
+  const { text, count } = clipboardTextSnapshot();
   if (!text || text.trim().length === 0) {
     showOverlayNotification(`Clipboard is empty. Copy code first (${MOD_LABEL}+C)`, 'error');
     return null;
   }
   showOverlayNotification('Code Block Added', 'code');
+  changeCountAtLastCapture = count;
   return { text };
 }
 
@@ -2733,6 +2812,10 @@ app.whenReady().then(() => {
     explainFeature.warmUp();
   };
   watchMacFrontApp();
+  // Starts the pasteboard sequence-number helper on macOS and does nothing
+  // anywhere else. The capture guard works without it, just less well, so a
+  // failure here is never fatal.
+  pasteboardMac.start();
   mainWindow.once('show', () => setTimeout(warmSecondaryWindows, 1500));
   setTimeout(warmSecondaryWindows, 6000); // fallback if the window stays hidden
 
@@ -2746,5 +2829,6 @@ app.on('window-all-closed', () => { /* Keep running in tray */ });
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   stopTitleHelper();
+  pasteboardMac.stop();
   explainFeature.shutdown();
 });
