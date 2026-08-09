@@ -176,12 +176,29 @@ function App() {
     };
     window.addEventListener('beforeunload', onBeforeUnload);
 
+    // Losing focus is the last safe moment to write. A capture from another
+    // app can only happen after this window has lost focus, and the
+    // file-updated handler above has to throw pending edits away when it
+    // lands, otherwise the debounced save would overwrite the capture with
+    // pre-capture content. Flushing here means there is nothing left to throw
+    // away: type a paragraph, alt-tab to Chrome, capture, and the paragraph is
+    // already on disk instead of being replaced by the version without it.
+    const onBlur = () => {
+      if (pendingSaveRef.current === null || !window.electronAPI) return;
+      clearTimeout(saveTimerRef.current);
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      window.electronAPI.saveFileContent(pending);
+    };
+    window.addEventListener('blur', onBlur);
+
     return () => {
       unsubFileUpdated();
       unsubStartRecording();
       unsubStopRecording();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 
