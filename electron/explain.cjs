@@ -24,7 +24,29 @@ const INVALID_COORD = -99999;
 // screenshots vanish before Ctrl+Shift+V could paste them. On macOS it was also
 // dishonest, silently returning stale clipboard text as if it were a fresh
 // selection. Explain reads selections through UI Automation / AXAPI only.
-const HOOK_START_OPTS = { enableClipboard: false };
+/**
+ * Passive mode is the difference between Casrion being invisible and Casrion
+ * making the whole machine feel slow.
+ *
+ * Left off (which is the library's default), the hook answers every drag
+ * selection and every double click by reading the selected text through UI
+ * Automation on Windows and the Accessibility API on macOS. Both are
+ * synchronous cross-process calls, and crucially both are served by the UI
+ * thread of the app being read. So finishing a selection in Chrome hands
+ * Chrome a job, and the Ctrl+C the user presses a moment later has to queue
+ * behind it. That is the two second copy: nothing to do with the copy, and
+ * everything to do with us interrogating the app at the exact moment the user
+ * was about to talk to it. It also runs on our own main thread, so the same
+ * read stalls Casrion.
+ *
+ * Giving it up costs nothing, because nothing in here wants a selection until
+ * the user asks for one. triggerExplain reads it on demand through
+ * getCurrentSelection(). One read when somebody double-taps, instead of one
+ * read every time anybody selects any text in any application, forever.
+ *
+ * Do not turn this off to "fix" a missed selection. Fix the on-demand read.
+ */
+const HOOK_START_OPTS = { enableClipboard: false, selectionPassiveMode: true };
 const WIN_W = 470;
 const WIN_H = 190;
 
@@ -195,10 +217,12 @@ function initSelectionHook(promptForTrust) {
   try {
     const SelectionHook = require('selection-hook');
     hook = new SelectionHook();
+    // Silent under passive mode, and kept only as a backstop for
+    // getSelectionNow in case passive mode is ever turned off again. Nothing
+    // expensive belongs in here: it runs for every selection on the machine.
     hook.on('text-selection', (data) => {
       if (data && data.text && data.text.trim()) {
         lastEventSelection = { data, ts: Date.now() };
-        maybePrewarm();
       }
     });
     // The popup opens without stealing focus, so blur can't dismiss it.
@@ -243,6 +267,17 @@ function initSelectionHook(promptForTrust) {
       if (e.uniKey !== TAP_KEY) return;
       if (tapDownAt && !tapDirty && Date.now() - tapDownAt < 400) {
         lastCleanTapUp = Date.now();
+        // Prewarming used to hang off text-selection, which passive mode no
+        // longer emits. A bare modifier tap is a better signal anyway: it
+        // means somebody is halfway through asking a question, where selecting
+        // text only ever meant they were reading.
+        //
+        // Deferred past the double-tap window on purpose. Loading the model
+        // is asynchronous, but it is still work on this thread, and the second
+        // tap has to be noticed within 400ms or the gesture is lost. If the
+        // tap does complete, the real run is already loading by the time this
+        // fires and every guard inside turns it into a no-op.
+        setTimeout(maybePrewarm, 450);
       }
       tapDownAt = 0;
     });
@@ -271,8 +306,10 @@ function getSelectionNow() {
     try { sel = hook.getCurrentSelection(); } catch { sel = null; }
   }
   if (sel && sel.text && sel.text.trim()) return sel;
-  // The on-demand read can miss (some apps only expose the selection at
-  // mouse-up time); a selection made in the last few seconds still counts.
+  // Under passive mode this is normally empty, because the event that fills it
+  // is exactly the one that was stalling every copy (see HOOK_START_OPTS). It
+  // stays as a backstop for the non-passive configuration rather than as the
+  // path anything relies on.
   if (lastEventSelection && Date.now() - lastEventSelection.ts < 15000) {
     return lastEventSelection.data;
   }
@@ -476,7 +513,7 @@ function beginRun(sel) {
     send('explain-status', { state: 'need-model', modelLabel: llm.MODEL_LABEL });
     return;
   }
-  // A real question is about to run, so future sessions may prewarm on selection
+  // A real question is about to run, so future sessions may prewarm on a tap
   markExplainUsed();
 
   // Context is captured once per selection, BEFORE the popup paints: the

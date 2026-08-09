@@ -1190,15 +1190,24 @@ function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true
   // (wantUrl=false): it spawns osascript and would trigger a per-browser
   // Automation prompt the explain flow does not need.
   if (process.platform === 'darwin') {
-    let hookApp = '';
-    try { hookApp = explainFeature.getForegroundAppName(); } catch { hookApp = ''; }
-    // Explain wants the app the selection came from, which is exactly what
-    // the hook just read - answer instantly, no child process.
-    if (!wantUrl && hookApp) {
-      return Promise.resolve({ title: '', proc: hookApp.toLowerCase(), app: hookApp, url: '' });
+    // Asking the hook for the app name is not free: it is a full Accessibility
+    // selection read of the frontmost app, served by that app's own UI thread.
+    // Explain is about to do one anyway, so there it is genuinely a fast path.
+    // A capture is not, and this used to run the read on every single capture
+    // and then call lsappinfo regardless, throwing the expensive answer away.
+    if (!wantUrl) {
+      let hookApp = '';
+      try { hookApp = explainFeature.getForegroundAppName(); } catch { hookApp = ''; }
+      if (hookApp) {
+        return Promise.resolve({ title: '', proc: hookApp.toLowerCase(), app: hookApp, url: '' });
+      }
     }
     return getMacFrontAppName(Math.min(timeoutMs, 800)).then((front) => {
-      const app = front || hookApp;
+      let app = front;
+      // Only worth paying for the read once the free tool has actually failed.
+      if (!app) {
+        try { app = explainFeature.getForegroundAppName(); } catch { app = ''; }
+      }
       if (!app) return null;
       const base = { title: '', proc: app.toLowerCase(), app, url: '' };
       const script = wantUrl ? macBrowserUrlScript(app) : null;
