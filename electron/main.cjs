@@ -1238,7 +1238,7 @@ function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true
         return Promise.resolve({ title: '', proc: hookApp.toLowerCase(), app: hookApp, url: '' });
       }
     }
-    return getMacFrontAppName(Math.min(timeoutMs, 800)).then((front) => {
+    return macFrontAppNameCached(Math.min(timeoutMs, 800)).then((front) => {
       let app = front;
       // Only worth paying for the read once the free tool has actually failed.
       if (!app) {
@@ -1273,6 +1273,61 @@ function getForegroundSourceInfo(timeoutMs = 1200, force = false, wantUrl = true
 // Name the frontmost app via lsappinfo, a stock macOS tool that needs no
 // privacy permission at all. This is what makes source stamping work even
 // when Accessibility is missing or the front app hides its selection.
+/**
+ * macOS pays far more for a source stamp than Windows does.
+ *
+ * Windows answers out of one long-lived helper process, measured at roughly
+ * 5ms a capture. macOS spawns /bin/sh plus two lsappinfo calls to name the
+ * frontmost app, and then, only once that has come back, an osascript to ask
+ * the browser for its URL. Four processes in two sequential stages, on every
+ * single capture. That is what makes fast note taking feel heavy on a Mac.
+ *
+ * The app name is the half worth caching, because macOS says for free when it
+ * changes: AppKit posts an activation notification whenever a different app is
+ * brought to the front. So the name only has to be looked up again after a
+ * real switch, and the URL step stops queueing behind it.
+ *
+ * The URL is deliberately NOT cached. Changing browser tab changes the URL and
+ * posts no notification at all, so a cached one would eventually stamp a quote
+ * with a page it did not come from. Being slow beats being wrong.
+ *
+ * Every failure degrades to exactly the old behaviour: if the subscription
+ * throws, the flag just stays dirty and every capture looks the app up the long
+ * way. The TTL is a second belt for the case where notifications stop arriving.
+ */
+let macFrontApp = '';
+let macFrontAppAt = 0;
+let macFrontAppDirty = true;
+const MAC_FRONT_APP_TTL = 2000;
+
+function watchMacFrontApp() {
+  if (process.platform !== 'darwin') return;
+  try {
+    systemPreferences.subscribeWorkspaceNotification(
+      'NSWorkspaceDidActivateApplicationNotification',
+      () => { macFrontAppDirty = true; }
+    );
+  } catch (e) {
+    // Nothing to repair: dirty forever means look it up every time, as before.
+    macFrontAppDirty = true;
+    console.warn('[Casrion] No app-activation notifications:', e.message);
+  }
+}
+
+function macFrontAppNameCached(timeoutMs) {
+  if (!macFrontAppDirty && macFrontApp && Date.now() - macFrontAppAt < MAC_FRONT_APP_TTL) {
+    return Promise.resolve(macFrontApp);
+  }
+  return getMacFrontAppName(timeoutMs).then((name) => {
+    if (name) {
+      macFrontApp = name;
+      macFrontAppAt = Date.now();
+      macFrontAppDirty = false;
+    }
+    return name;
+  });
+}
+
 function getMacFrontAppName(timeoutMs) {
   return new Promise((resolve) => {
     let done = false;
@@ -2673,6 +2728,7 @@ app.whenReady().then(() => {
     // user actually wants them.
     explainFeature.warmUp();
   };
+  watchMacFrontApp();
   mainWindow.once('show', () => setTimeout(warmSecondaryWindows, 1500));
   setTimeout(warmSecondaryWindows, 6000); // fallback if the window stays hidden
 
