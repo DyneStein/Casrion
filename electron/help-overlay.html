@@ -62,6 +62,7 @@
     .shortcut-action {
       font-size: 12px; color: #5f5344; font-weight: 500;
     }
+    .win-only { color: #9a8b78; font-weight: 400; }
     .shortcut-keys {
       display: flex; align-items: center; gap: 3px;
     }
@@ -166,7 +167,7 @@
       <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">Y</span></div>
     </div>
     <div class="shortcut-row">
-      <span class="shortcut-action">Explain Selection</span>
+      <span class="shortcut-action">Explain Selection <span class="win-only">(or tap Ctrl twice)</span></span>
       <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key-sep">+</span><span class="key">Shift</span><span class="key-sep">+</span><span class="key">E</span></div>
     </div>
     <div class="shortcut-row">
@@ -182,6 +183,9 @@
     // Ctrl->Cmd, but a few use different keys to dodge reserved macOS system
     // shortcuts; those rows carry a data-mac attribute with the real sequence.
     if (process.platform === 'darwin') {
+      // The double-tap gesture is Windows only, so its mention goes with it.
+      // See the header of explain.cjs for why the platforms differ here.
+      document.querySelectorAll('.win-only').forEach((el) => el.remove());
       const buildKeys = (str) => str.split(/([+/])/).filter((s) => s.length).map((p) =>
         (p === '+' || p === '/') ? '<span class="key-sep">' + p + '</span>' : '<span class="key">' + p + '</span>'
       ).join('');

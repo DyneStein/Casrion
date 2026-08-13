@@ -4,14 +4,14 @@
 // selection-hook native addon (UI Automation), page context comes from the
 // title helper plus a quick OCR of the pixels around the selection.
 //
-// There used to be a second way in: tapping the bare modifier key twice. It is
-// gone on purpose. The gesture needed the global keyboard tap, which on macOS
-// means Input Monitoring, a permission most people never granted, and when it
-// is missing the gesture fails silently: no popup, no error, nothing to tell
-// you which of the two permissions you were missing. The chord needs no
-// permission at all because Electron registers it with the window server, so
-// it works the moment the app starts. One way in that always works beats two
-// where the nicer one usually does not.
+// There is a second way in on Windows: tapping the bare Ctrl key twice. It is
+// Windows only, and that split is deliberate rather than an oversight. The
+// gesture needs the global keyboard tap, which on Windows costs nothing and
+// asks for no permission, and on macOS means Input Monitoring, a permission
+// most people never granted. When it is missing the gesture fails silently:
+// no popup, no error, nothing to tell you which of the two permissions you
+// were missing. So macOS gets the one way in that always works, and Windows
+// keeps both, because there the nicer one actually fires.
 const path = require('path');
 const { BrowserWindow, screen, ipcMain, systemPreferences } = require('electron');
 const llm = require('./llm.cjs');
@@ -19,6 +19,11 @@ const ocr = require('./ocr.cjs');
 
 const IS_MAC = process.platform === 'darwin';
 const INVALID_COORD = -99999;
+// The bare modifier the double-tap gesture watches for, Windows only. Null on
+// macOS is what switches the whole gesture off there, keyboard subscriptions
+// included, so nothing on that platform looks at what you type.
+const TAP_KEY = IS_MAC ? null : 'Control';
+const TAP_WINDOW_MS = 400;
 
 // The selection hook's clipboard fallback is OFF everywhere, and must stay off.
 // When a native accessibility read finds nothing, that fallback empties the
@@ -248,9 +253,52 @@ function initSelectionHook(promptForTrust) {
         hideExplain();
       }
     });
-    // No key-down/key-up subscription any more. The only thing that ever
-    // listened was the double-tap gesture, and prewarming hung off the same
-    // signal. Both are gone, so nothing here reads your keystrokes.
+    // Double-tap Ctrl triggers explain: one key, no chord to remember, and it
+    // collides with nothing because the bare modifier does nothing anywhere.
+    // A tap only counts when the key went down and back up with no other key
+    // in between, so copy/paste chords and held-key auto-repeat never fire it.
+    //
+    // Windows only. TAP_KEY is null on macOS, so the two subscriptions below
+    // are never created there and the hook is never asked for keystrokes:
+    // that is what keeps Input Monitoring optional on that platform, and what
+    // makes "Casrion does not watch your typing" true on it.
+    if (TAP_KEY) {
+      let tapDownAt = 0;       // 0 while the key is up (also gates auto-repeat)
+      let tapDirty = false;    // another key was pressed while it was held
+      let lastCleanTapUp = 0;
+      hook.on('key-down', (e) => {
+        if (e.uniKey === TAP_KEY) {
+          if (tapDownAt) return; // auto-repeat of a held modifier
+          tapDownAt = Date.now();
+          tapDirty = false;
+          if (lastCleanTapUp && tapDownAt - lastCleanTapUp < TAP_WINDOW_MS) {
+            lastCleanTapUp = 0;
+            triggerExplain();
+          }
+        } else {
+          tapDirty = true;
+          lastCleanTapUp = 0;
+        }
+      });
+      hook.on('key-up', (e) => {
+        if (e.uniKey !== TAP_KEY) return;
+        if (tapDownAt && !tapDirty && Date.now() - tapDownAt < TAP_WINDOW_MS) {
+          lastCleanTapUp = Date.now();
+          // A bare modifier tap means somebody is halfway through asking a
+          // question, which is the only signal in the app worth prewarming on:
+          // selecting text only ever meant they were reading.
+          //
+          // Deferred past the double-tap window on purpose. Loading the model
+          // is asynchronous, but it is still work on this thread, and the
+          // second tap has to be noticed within TAP_WINDOW_MS or the gesture
+          // is lost. If the tap does complete, the real run is already loading
+          // by the time this fires and every guard inside turns it into a
+          // no-op.
+          setTimeout(maybePrewarm, TAP_WINDOW_MS + 50);
+        }
+        tapDownAt = 0;
+      });
+    }
     hook.on('error', (err) => console.error('[Casrion] selection-hook:', err && err.message));
     hook.on('status', (s) => console.log('[Casrion] selection-hook status:', s));
     const ok = hook.start(HOOK_START_OPTS);
@@ -290,16 +338,26 @@ function getSelectionNow() {
  * The first read of an app is allowed to fail, so ask twice.
  *
  * Chromium browsers and Electron apps do not publish an accessibility tree
- * until somebody asks them to, by setting AXEnhancedUserInterface (Chromium)
- * or AXManualAccessibility (Electron) on the application element. selection-hook
- * does set both, but only after its own read has already failed, and it then
- * returns that failure without trying again (selection_hook.mm, end of
- * GetTextViaAXAPI: the comment says "final try" and no retry follows it). The
- * tree it just switched on is not read until the next call.
+ * until somebody asks them to. On macOS that means setting
+ * AXEnhancedUserInterface (Chromium) or AXManualAccessibility (Electron) on the
+ * application element; selection-hook does set both, but only after its own
+ * read has already failed, and it then returns that failure without trying
+ * again (selection_hook.mm, end of GetTextViaAXAPI: the comment says "final
+ * try" and no retry follows it). The tree it just switched on is not read until
+ * the next call.
  *
  * So the first press of the shortcut at a given app is guaranteed to come back
  * empty, and the popup says nothing is selected while pointing at a paragraph
  * that plainly is. Asking a second time, once the tree exists, is the whole fix.
+ *
+ * This is NOT macOS only, which is what it was gated to until it got measured.
+ * Windows Chromium switches its tree on when a UI Automation client first asks,
+ * with the same ask-fail-enable-do-not-retry shape, so the same first presses
+ * are lost. Observed on Brave with the diagnostic in getSelectionNow: three
+ * consecutive triggers returned null, and the fourth returned the word that had
+ * been selected the entire time. It reads as "it works sometimes", or as one
+ * way of selecting being broken, because whichever way you happened to try
+ * fourth is the one that worked.
  *
  * Deliberately not a blocking wait: this runs in the shortcut handler, and
  * parking the main thread here would stall the popup it is about to open.
@@ -314,7 +372,7 @@ function getSelectionNow() {
 const AX_WAKE_STEPS_MS = [120, 180, 400];
 function getSelectionSoon(done) {
   const first = getSelectionNow();
-  if (first || !IS_MAC) { done(first); return; }
+  if (first) { done(first); return; }
   let step = 0;
   const again = () => {
     const sel = getSelectionNow();
@@ -426,16 +484,43 @@ function warnIfUpdateDroppedPermission() {
   }, 4000);
 }
 
-// There is no prewarming any more. It only ever had one trigger, a bare tap of
-// the modifier key, and that went with the double-tap gesture. Every remaining
-// candidate signal is either useless (the chord itself, which arrives at the
-// same moment as the work it would be racing) or unacceptable (prewarming on
-// any click anywhere, which is what the mouse hook sees).
+// Prewarming has exactly one trigger, a bare tap of the modifier key, so it
+// only ever happens on Windows. Every other candidate signal is either useless
+// (the chord itself, which arrives at the same moment as the work it would be
+// racing) or unacceptable (prewarming on any click anywhere, which is what the
+// mouse hook sees).
 //
-// So the first question of a session pays for the window, the OCR helper and
-// the model load, and every question after it finds them up. That cost was
-// already being paid by anyone whose tap had not fired first, which on macOS
-// was anyone without Input Monitoring: most people.
+// On macOS, and on Windows when the first tap of a session is the second half
+// of a double-tap, the first question pays for the window, the OCR helper and
+// the model load, and every question after it finds them up.
+let prewarmed = false;
+
+function maybePrewarm() {
+  if (prewarmed || !deps || !isEnabled()) return;
+  // Never on a machine that has not used explain yet: it would load a 1.1GB
+  // model because somebody tapped Ctrl, for a feature they may never open.
+  if (!deps.getSettings().explainUsed) return;
+  prewarmed = true;
+  // Each of these is warmed here rather than at launch, and each has an
+  // on-demand backstop if the hotkey gets there first: triggerExplain builds
+  // the window, ocrRegion starts the helper, ensureLoaded loads the model.
+  if (!explainWindow || explainWindow.isDestroyed()) createExplainWindow();
+  // The OCR helper is a whole PowerShell process (~70MB) and it has to be up
+  // before the first question, since its screenshot has to beat the popup's
+  // paint.
+  ocr.startOcrHelper();
+  if (llm.hasModelFile()) {
+    llm.prewarm().catch(() => { /* the first real question loads it instead */ });
+  }
+}
+
+function markExplainUsed() {
+  const settings = deps.getSettings();
+  if (settings.explainUsed) return;
+  settings.explainUsed = true;
+  prewarmed = true; // it is loading for this very question already
+  deps.saveSettings();
+}
 
 function validPoint(p) {
   return p && p.x !== INVALID_COORD && p.y !== INVALID_COORD && !(p.x === 0 && p.y === 0);
@@ -581,6 +666,9 @@ function beginRun(sel) {
     send('explain-status', { state: 'need-model', modelLabel: llm.MODEL_LABEL });
     return;
   }
+  // A real question is about to run, so future sessions may prewarm on a tap
+  markExplainUsed();
+
   // Context is captured once per selection, BEFORE the popup paints: the
   // OCR screenshots the pixels around the selection, and the popup sits
   // right there. Reruns (quick/detail toggle) reuse the clean capture.

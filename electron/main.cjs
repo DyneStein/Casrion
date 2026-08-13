@@ -1044,7 +1044,8 @@ function refreshTrayMenu() {
       click: (item) => setStampSource(item.checked)
     },
     {
-      label: `Explain selection (${MOD_LABEL}+Shift+E)`,
+      // The double-tap half is Windows only; see the header of explain.cjs.
+      label: `Explain selection (${MOD_LABEL}+Shift+E${MOD_LABEL === 'Ctrl' ? ', or tap Ctrl twice' : ''})`,
       type: 'checkbox',
       checked: settings.explainEnabled !== false,
       click: (item) => explainFeature.setEnabled(item.checked)

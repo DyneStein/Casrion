@@ -124,6 +124,7 @@ function HelpPanel({ onClose }) {
           <section>
             <h2>Explain anything, anywhere</h2>
             <Shortcut keys={`${MOD}+Shift+E`} action="Explain whatever you have selected" />
+            {!IS_MAC && <Shortcut keys="Ctrl+Ctrl" action="The same thing, by tapping Ctrl twice" />}
             <p>
               Highlight a word, sentence or formula in any app, then press
               {' '}{MOD}+Shift+E. A small popup appears next to your selection with a
@@ -133,6 +134,16 @@ function HelpPanel({ onClose }) {
               ever leaves your machine. Switch between Quick and Detailed answers
               in the popup, copy the answer, or save it straight into your note.
             </p>
+            {!IS_MAC && (
+              <p>
+                Tapping Ctrl twice, quickly, does the same thing. It only counts as
+                a tap when Ctrl goes down and back up with nothing pressed in
+                between, so copying and pasting never sets it off by accident. This
+                one is Windows only: on a Mac, watching for the gesture would need a
+                second permission that most people never grant, and it fails
+                silently when it is missing.
+              </p>
+            )}
             {IS_MAC && (
               <p>
                 <strong>Safari is the exception.</strong> It does not hand its page
