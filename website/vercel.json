@@ -8,7 +8,7 @@
     },
     {
       "source": "/get-mac",
-      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.2/Casrion-1.0.2-arm64.dmg",
+      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.3/Casrion-1.0.3-arm64.dmg",
       "statusCode": 302
     }
   ]
