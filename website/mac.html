@@ -212,6 +212,12 @@
     </p>
 
     <p>
+      One honest exception: <b>not in Safari</b>. Safari keeps its page text to
+      itself, so Casrion has nothing to read there. TextEdit, Notes, Preview,
+      PDFs and Chrome all work.
+    </p>
+
+    <p>
       The first time you use it, it downloads a small model, once. After that it
       works on a plane. Nothing you highlight is ever sent anywhere, because
       there is nowhere for it to be sent to.
@@ -224,7 +230,7 @@
       <dd>Right click it in Applications and choose <b>Open</b>, then <b>Open</b> again. Double clicking will not do it. If it still refuses, <code>xattr -cr /Applications/Casrion.app</code> in Terminal once.</dd>
 
       <dt>Explain says nothing is selected, but I selected something.</dt>
-      <dd>Accessibility is off, or it is on for an older copy of the app. Turn it on, then quit Casrion from the menu bar and reopen it. A few apps also genuinely keep their selection to themselves, and Casrion will say so when that is what happened.</dd>
+      <dd>If you were in <b>Safari</b>, that is expected and there is no fix. Safari does not hand its page text to other apps through the accessibility system, so there is nothing for Casrion to read. It works in TextEdit, Notes, Preview, PDFs and Chrome. Anywhere else, Accessibility is either off or still switched on for an older copy of the app: turn it on, then quit Casrion from the menu bar and reopen it.</dd>
 
       <dt>The explain popup will not go away when I click somewhere.</dt>
       <dd>Same switch. Noticing a click outside its own window is exactly the thing Input Monitoring governs. Turn it on, then quit and reopen. Casrion spots this happening and offers you the settings pane from inside the popup.</dd>

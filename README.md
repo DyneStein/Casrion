@@ -80,7 +80,7 @@ Every shortcut below is global. They work while you are in Chrome, a PDF, Word, 
 | Undo / redo the last capture | `Ctrl Shift Z` / `Y` | `Cmd Shift Z` / `Y` |
 | Show every shortcut | `Ctrl Shift H` | `Cmd Shift H` |
 
-**Explain a selection.** Highlight anything, press `Ctrl+Shift+E` (`Cmd+Shift+E` on macOS), and a small window tells you what it says. It OCRs the screen around your selection first, so it knows a loose symbol belongs to the formula three lines up. Runs on a local model, so it works on a plane and nothing you highlight leaves the machine.
+**Explain a selection.** Highlight anything, press `Ctrl+Shift+E` (`Cmd+Shift+E` on macOS), and a small window tells you what it says. On macOS, Safari is the one place this does not work: it does not expose page text to other apps through the accessibility system, so there is nothing to read. TextEdit, Notes, Preview, PDFs and Chrome are all fine. It OCRs the screen around your selection first, so it knows a loose symbol belongs to the formula three lines up. Runs on a local model, so it works on a plane and nothing you highlight leaves the machine.
 
 ---
 

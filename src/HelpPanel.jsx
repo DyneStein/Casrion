@@ -135,6 +135,14 @@ function HelpPanel({ onClose }) {
             </p>
             {IS_MAC && (
               <p>
+                <strong>Safari is the exception.</strong> It does not hand its page
+                text to other apps through the accessibility system, so explain cannot
+                read a selection there and will say nothing is selected. TextEdit,
+                Notes, Preview, PDFs and Chrome all work.
+              </p>
+            )}
+            {IS_MAC && (
+              <p>
                 On a Mac this needs one permission in System Settings &gt; Privacy
                 &amp; Security: <strong>Accessibility</strong>, which lets Casrion read
                 the text you selected. <strong>Input Monitoring</strong> is optional and

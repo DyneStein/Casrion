@@ -268,7 +268,8 @@
     const modeQuick = document.getElementById('modeQuick');
     const modeDetail = document.getElementById('modeDetail');
 
-    const SHORTCUT = (process.platform === 'darwin' ? 'Cmd' : 'Ctrl') + '+Shift+E';
+    const IS_MAC = process.platform === 'darwin';
+    const SHORTCUT = (IS_MAC ? 'Cmd' : 'Ctrl') + '+Shift+E';
 
     let detailMode = false;
     function paintMode() {
@@ -356,7 +357,9 @@
     ipcRenderer.on('explain-status', (_event, s) => {
       panel.dataset.state = s.state;
       if (s.state === 'no-selection') {
-        setPending('Nothing selected. Highlight some text, then press ' + SHORTCUT + '. If you did highlight something, either that app keeps its selection to itself, or Accessibility is still granted to an older build of Casrion: remove Casrion from that list in System Settings with the minus button, add it back, then quit and reopen Casrion.');
+        setPending(IS_MAC
+          ? 'Nothing selected. Safari does not hand its page text to other apps, so explain cannot read a selection there. It works in TextEdit, Notes, Preview, PDFs and Chrome. If it cannot read one of those either, Accessibility is probably still granted to an older build: remove Casrion from that list in System Settings with the minus button, add it back, then quit and reopen Casrion.'
+          : 'Nothing selected. Highlight some text, then press ' + SHORTCUT + '. A few apps keep their selection to themselves.');
         requestResize();
       } else if (s.state === 'need-permission') {
         // Toggling a stale row off and on does not help: macOS remembers the

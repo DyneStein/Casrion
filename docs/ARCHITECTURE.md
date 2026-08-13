@@ -73,6 +73,8 @@ The `casrion://` protocol handler refuses to serve anything outside a registered
 
 Select text anywhere, press `Ctrl+Shift+E` (`Cmd+Shift+E` on macOS), get a local model's explanation in a popup near the selection.
 
+Safari on macOS is a known gap. Its page selections are not published as `AXSelectedText`, so the on-demand read comes back empty and the popup says so. Chromium browsers and Electron apps publish nothing either until `AXEnhancedUserInterface` or `AXManualAccessibility` is set on them, which selection-hook does on a failed read without retrying, so `getSelectionSoon` reads again a few times before giving up. That retry is what makes those browsers work at all.
+
 - **Reading the selection** uses `selection-hook`, a native module that goes through the platform accessibility APIs. The clipboard fallback that library offers is **deliberately disabled**: it simulates Ctrl+C, which empties whatever the user actually had on their clipboard, including screenshots. Do not turn it back on.
 - **The overlay shows first, then the work starts.** It is pre-created and shown with `showInactive()` so the user's app keeps focus and their selection stays highlighted.
 - **Context radius, Windows only.** `ocr.cjs` screenshots a region around the selection and OCRs it through the built-in `Windows.Media.Ocr` WinRT API, driven from a persistent PowerShell process. This is what lets the model know a stray symbol belongs to the formula three lines above it. There is no macOS equivalent wired up, so on macOS the model gets the selection plus window title and URL, and explanations of formulas in PDFs are correspondingly weaker. This is the most obvious open contribution in the codebase.

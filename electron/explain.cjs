@@ -305,11 +305,23 @@ function getSelectionNow() {
  * parking the main thread here would stall the popup it is about to open.
  * The cost is only ever paid on a read that already failed.
  */
-const AX_WAKE_MS = 140;
+// Backing off rather than one fixed pause, because "switch the tree on" and
+// "the tree is ready to read" are not the same moment and nothing tells us
+// when the second one arrives. A browser has a whole document to publish, and
+// one 140ms wait proved too impatient for it. Worst case is about 700ms, paid
+// only when the first read already failed, and every step returns the instant
+// an answer appears, so an app that was merely slow costs only what it needed.
+const AX_WAKE_STEPS_MS = [120, 180, 400];
 function getSelectionSoon(done) {
   const first = getSelectionNow();
   if (first || !IS_MAC) { done(first); return; }
-  setTimeout(() => done(getSelectionNow()), AX_WAKE_MS);
+  let step = 0;
+  const again = () => {
+    const sel = getSelectionNow();
+    if (sel || step >= AX_WAKE_STEPS_MS.length) { done(sel); return; }
+    setTimeout(again, AX_WAKE_STEPS_MS[step++]);
+  };
+  setTimeout(again, AX_WAKE_STEPS_MS[step++]);
 }
 
 // ── window ──────────────────────────────────────────────────
@@ -425,13 +437,6 @@ function warnIfUpdateDroppedPermission() {
 // already being paid by anyone whose tap had not fired first, which on macOS
 // was anyone without Input Monitoring: most people.
 
-function markExplainUsed() {
-  const settings = deps.getSettings();
-  if (settings.explainUsed) return;
-  settings.explainUsed = true;
-  deps.saveSettings();
-}
-
 function validPoint(p) {
   return p && p.x !== INVALID_COORD && p.y !== INVALID_COORD && !(p.x === 0 && p.y === 0);
 }
@@ -483,23 +488,36 @@ function hideExplain() {
 
 // ── the hotkey flow ─────────────────────────────────────────
 
+// Each press supersedes the one before it. Without this, two quick presses
+// start two retry chains and the slower one lands after the faster one has
+// already opened or closed the popup, undoing it.
+let triggerSeq = 0;
+
 function triggerExplain() {
   if (!deps || !isEnabled()) return;
   initSelectionHook(true); // a real trigger may prompt for macOS Accessibility
-  // Toggling closed must stay instant, and it does not need the selection to
-  // be right: pressing the shortcut again while the popup is up means close it.
-  // Only a read that came back empty waits, and only on macOS.
+  const mine = ++triggerSeq;
   const visible = explainWindow && !explainWindow.isDestroyed() && explainWindow.isVisible();
-  getSelectionSoon((sel) => {
-    // Same selection (or none) while open means "close it"
-    if (visible && (!sel || sel.text.trim() === lastShownText)) {
-      hideExplain();
-      return;
-    }
 
+  // Closing has to be instant. Waiting out the retry before dismissing would
+  // make the popup hang around for most of a second after the key that asked
+  // it to go away, which reads as the app being stuck. Nothing is lost by
+  // reading once here: the popup being up means a read of this app already
+  // succeeded, so its accessibility tree is awake and the first read is good.
+  if (visible) {
+    const sel = getSelectionNow();
+    if (!sel || sel.text.trim() === lastShownText) { hideExplain(); return; }
+    beginRun(sel);
+    return;
+  }
+
+  getSelectionSoon((sel) => {
+    if (mine !== triggerSeq) return; // a newer press already took over
     if (!explainWindow || explainWindow.isDestroyed()) {
       createExplainWindow();
-      explainWindow.webContents.once('did-finish-load', () => beginRun(sel));
+      explainWindow.webContents.once('did-finish-load', () => {
+        if (mine === triggerSeq) beginRun(sel);
+      });
       return;
     }
     beginRun(sel);
@@ -563,9 +581,6 @@ function beginRun(sel) {
     send('explain-status', { state: 'need-model', modelLabel: llm.MODEL_LABEL });
     return;
   }
-  // A real question is about to run, so future sessions may prewarm on a tap
-  markExplainUsed();
-
   // Context is captured once per selection, BEFORE the popup paints: the
   // OCR screenshots the pixels around the selection, and the popup sits
   // right there. Reruns (quick/detail toggle) reuse the clean capture.
