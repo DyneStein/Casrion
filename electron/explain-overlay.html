@@ -356,7 +356,7 @@
     ipcRenderer.on('explain-status', (_event, s) => {
       panel.dataset.state = s.state;
       if (s.state === 'no-selection') {
-        setPending('Nothing selected' + (s.app ? ' in ' + s.app : '') + '. Highlight some text, then press ' + SHORTCUT + '. If you did highlight something, either that app keeps its selection to itself, or Accessibility is still granted to an older build of Casrion: remove Casrion from that list in System Settings with the minus button, add it back, then quit and reopen Casrion.');
+        setPending('Nothing selected. Highlight some text, then press ' + SHORTCUT + '. If you did highlight something, either that app keeps its selection to itself, or Accessibility is still granted to an older build of Casrion: remove Casrion from that list in System Settings with the minus button, add it back, then quit and reopen Casrion.');
         requestResize();
       } else if (s.state === 'need-permission') {
         // Toggling a stale row off and on does not help: macOS remembers the

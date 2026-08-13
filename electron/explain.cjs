@@ -286,6 +286,32 @@ function getSelectionNow() {
   return null;
 }
 
+/**
+ * The first read of an app is allowed to fail, so ask twice.
+ *
+ * Chromium browsers and Electron apps do not publish an accessibility tree
+ * until somebody asks them to, by setting AXEnhancedUserInterface (Chromium)
+ * or AXManualAccessibility (Electron) on the application element. selection-hook
+ * does set both, but only after its own read has already failed, and it then
+ * returns that failure without trying again (selection_hook.mm, end of
+ * GetTextViaAXAPI: the comment says "final try" and no retry follows it). The
+ * tree it just switched on is not read until the next call.
+ *
+ * So the first press of the shortcut at a given app is guaranteed to come back
+ * empty, and the popup says nothing is selected while pointing at a paragraph
+ * that plainly is. Asking a second time, once the tree exists, is the whole fix.
+ *
+ * Deliberately not a blocking wait: this runs in the shortcut handler, and
+ * parking the main thread here would stall the popup it is about to open.
+ * The cost is only ever paid on a read that already failed.
+ */
+const AX_WAKE_MS = 140;
+function getSelectionSoon(done) {
+  const first = getSelectionNow();
+  if (first || !IS_MAC) { done(first); return; }
+  setTimeout(() => done(getSelectionNow()), AX_WAKE_MS);
+}
+
 // ── window ──────────────────────────────────────────────────
 
 function toDip(point) {
@@ -460,21 +486,24 @@ function hideExplain() {
 function triggerExplain() {
   if (!deps || !isEnabled()) return;
   initSelectionHook(true); // a real trigger may prompt for macOS Accessibility
-  const sel = getSelectionNow();
-
-  // Same selection (or none) while open means "close it"
+  // Toggling closed must stay instant, and it does not need the selection to
+  // be right: pressing the shortcut again while the popup is up means close it.
+  // Only a read that came back empty waits, and only on macOS.
   const visible = explainWindow && !explainWindow.isDestroyed() && explainWindow.isVisible();
-  if (visible && (!sel || sel.text.trim() === lastShownText)) {
-    hideExplain();
-    return;
-  }
+  getSelectionSoon((sel) => {
+    // Same selection (or none) while open means "close it"
+    if (visible && (!sel || sel.text.trim() === lastShownText)) {
+      hideExplain();
+      return;
+    }
 
-  if (!explainWindow || explainWindow.isDestroyed()) {
-    createExplainWindow();
-    explainWindow.webContents.once('did-finish-load', () => beginRun(sel));
-    return;
-  }
-  beginRun(sel);
+    if (!explainWindow || explainWindow.isDestroyed()) {
+      createExplainWindow();
+      explainWindow.webContents.once('did-finish-load', () => beginRun(sel));
+      return;
+    }
+    beginRun(sel);
+  });
 }
 
 function beginRun(sel) {
