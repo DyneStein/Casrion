@@ -71,7 +71,7 @@ The `casrion://` protocol handler refuses to serve anything outside a registered
 
 ## The explain feature
 
-Select text anywhere, tap `Ctrl` (or `Cmd`) twice, get a local model's explanation in a popup near the selection.
+Select text anywhere, press `Ctrl+Shift+E` (`Cmd+Shift+E` on macOS), get a local model's explanation in a popup near the selection.
 
 - **Reading the selection** uses `selection-hook`, a native module that goes through the platform accessibility APIs. The clipboard fallback that library offers is **deliberately disabled**: it simulates Ctrl+C, which empties whatever the user actually had on their clipboard, including screenshots. Do not turn it back on.
 - **The overlay shows first, then the work starts.** It is pre-created and shown with `showInactive()` so the user's app keeps focus and their selection stays highlighted.

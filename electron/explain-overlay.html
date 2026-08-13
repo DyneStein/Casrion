@@ -268,7 +268,7 @@
     const modeQuick = document.getElementById('modeQuick');
     const modeDetail = document.getElementById('modeDetail');
 
-    const TAP_NAME = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
+    const SHORTCUT = (process.platform === 'darwin' ? 'Cmd' : 'Ctrl') + '+Shift+E';
 
     let detailMode = false;
     function paintMode() {
@@ -356,9 +356,13 @@
     ipcRenderer.on('explain-status', (_event, s) => {
       panel.dataset.state = s.state;
       if (s.state === 'no-selection') {
-        setPending('Nothing selected. Highlight some text anywhere, then double-tap ' + TAP_NAME + '. A few apps keep their selection to themselves.');
+        setPending('Nothing selected' + (s.app ? ' in ' + s.app : '') + '. Highlight some text, then press ' + SHORTCUT + '. If you did highlight something, either that app keeps its selection to itself, or Accessibility is still granted to an older build of Casrion: remove Casrion from that list in System Settings with the minus button, add it back, then quit and reopen Casrion.');
+        requestResize();
       } else if (s.state === 'need-permission') {
-        setPending('Casrion needs Accessibility permission to read your selection. Open System Settings > Privacy & Security > Accessibility, turn Casrion ON (if it is already listed, toggle it off and back on), then fully quit Casrion from the menu bar and reopen it.');
+        // Toggling a stale row off and on does not help: macOS remembers the
+        // requirement it was granted under, and every Casrion build is signed
+        // with a different one. Only removing the row rewrites it.
+        setPending('Casrion needs Accessibility permission to read your selection. Open System Settings > Privacy & Security > Accessibility and turn Casrion ON. If Casrion is already listed there, select it, press the minus button to remove it, then add it back with plus: after an update the old entry no longer matches. Then quit Casrion from the menu bar and reopen it.');
         requestResize();
       } else if (s.state === 'need-model') {
         setPending('One-time setup: Casrion downloads a small offline brain so it can explain things without the internet.');
@@ -373,7 +377,7 @@
         setPending('Downloading the offline brain... ' + (s.pct || 0) + '%');
       } else if (s.state === 'downloaded') {
         progressWrap.classList.add('hidden');
-        setPending('All set. Highlight something and double-tap ' + TAP_NAME + ' to get an explanation.');
+        setPending('All set. Highlight something and press ' + SHORTCUT + ' to get an explanation.');
       } else if (s.state === 'warming') {
         setPending('Waking the model up, takes a few seconds. It stays quick after this.');
       } else if (s.state === 'thinking') {

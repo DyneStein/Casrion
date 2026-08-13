@@ -1044,7 +1044,7 @@ function refreshTrayMenu() {
       click: (item) => setStampSource(item.checked)
     },
     {
-      label: `Explain selection (double-tap ${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'})`,
+      label: `Explain selection (${MOD_LABEL}+Shift+E)`,
       type: 'checkbox',
       checked: settings.explainEnabled !== false,
       click: (item) => explainFeature.setEnabled(item.checked)
@@ -1056,9 +1056,10 @@ function refreshTrayMenu() {
         label: 'Explain permissions (macOS)',
         submenu: [
           { label: 'Open Accessibility settings (read selection)', click: () => openMacPrivacyPane('Privacy_Accessibility') },
-          // Not just the gesture: the same event tap is what notices you
-          // clicking away from the popup, so without this it will not close.
-          { label: 'Open Input Monitoring settings (double-tap Cmd, click to close)', click: () => openMacPrivacyPane('Privacy_ListenEvent') }
+          // The only thing left behind this one is noticing a click outside the
+          // popup so it can close. Explaining itself needs Accessibility above,
+          // and the shortcut needs neither.
+          { label: 'Open Input Monitoring settings (click outside to close)', click: () => openMacPrivacyPane('Privacy_ListenEvent') }
         ]
       }
     ] : []),
@@ -2338,7 +2339,11 @@ function registerIPC() {
       });
 
       // Inline audio (relative assets/ paths, plus legacy file:/// links)
-      const audioRegex = /<audio\s+controls\s+src="([^"]+)"><\/audio>/g;
+      // Tolerant of extra attributes and of the order they appear in, the same
+      // way the editor's parser is. The strict "controls then src" form is what
+      // Casrion writes, but a note that picked up anything else would silently
+      // export with a relative src pointing at a folder the reader does not have.
+      const audioRegex = /<audio\b[^>]*\bsrc="([^"]+)"[^>]*>\s*<\/audio>/g;
       content = content.replace(audioRegex, (match, uri) => {
         try {
           let audioFile = null;
@@ -2352,7 +2357,13 @@ function registerIPC() {
             // extension pasted in raw ("audio/m4a") is not a media type.
             const mime = ASSET_MIME[path.extname(audioFile).toLowerCase()] || 'audio/webm';
             const base64 = fs.readFileSync(audioFile).toString('base64');
-            return `<audio controls src="data:${mime};base64,${base64}"></audio>`;
+            // preload="auto" is not cosmetic. Without it phone browsers pick
+            // preload="none" to save data, so the first tap on play only starts
+            // decoding the clip and does nothing audible, and the second tap is
+            // the one that plays. The bytes are already inside the file by this
+            // point, so there is no download to defer and nothing to save.
+            // Viewer.jsx makes the same choice for local files, for the same reason.
+            return `<audio controls preload="auto" src="data:${mime};base64,${base64}"></audio>`;
           }
         } catch (e) {
           console.error('[Casrion] Failed to inline audio', uri, e);

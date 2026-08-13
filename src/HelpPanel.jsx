@@ -123,27 +123,30 @@ function HelpPanel({ onClose }) {
 
           <section>
             <h2>Explain anything, anywhere</h2>
-            <Shortcut keys={`${MOD}+${MOD}`} action="Explain whatever you have selected (tap twice)" />
+            <Shortcut keys={`${MOD}+Shift+E`} action="Explain whatever you have selected" />
             <p>
-              Highlight a word, sentence or formula in any app, then quickly tap
-              {' '}{MOD} twice. A small popup appears next to your selection with a
+              Highlight a word, sentence or formula in any app, then press
+              {' '}{MOD}+Shift+E. A small popup appears next to your selection with a
               plain-English explanation that understands the page you are reading.
               It runs on a small AI model stored on your computer (a one-time
               download of about 1.1 GB), so it works offline and nothing you read
               ever leaves your machine. Switch between Quick and Detailed answers
               in the popup, copy the answer, or save it straight into your note.
-              {' '}{MOD}+Shift+E does the same thing if you prefer a regular shortcut.
             </p>
             {IS_MAC && (
               <p>
-                On a Mac this feature needs two one-time permissions in System
-                Settings &gt; Privacy &amp; Security. <strong>Accessibility</strong> lets
-                Casrion read the text you selected (used by both Cmd+Shift+E and the
-                double-tap). <strong>Input Monitoring</strong> lets Casrion see the
-                double-tap of the Cmd key, so grant that one too if you want the
-                double-tap gesture. You can open both panes from the Casrion menu-bar
-                icon under &ldquo;Explain permissions&rdquo;. After turning a permission on,
-                quit and reopen Casrion once.
+                On a Mac this needs one permission in System Settings &gt; Privacy
+                &amp; Security: <strong>Accessibility</strong>, which lets Casrion read
+                the text you selected. <strong>Input Monitoring</strong> is optional and
+                only makes the popup close when you click outside it; without it the
+                popup still closes when you switch to another app, or with its own
+                close button. You can open both panes from the Casrion menu-bar
+                icon under &ldquo;Explain
+                permissions&rdquo;. After turning a permission on, quit and reopen
+                Casrion once. If Casrion is already listed and explain still cannot
+                read your selection, remove it from the list with the minus button and
+                add it back: an entry made for an older build stops matching after an
+                update.
               </p>
             )}
           </section>

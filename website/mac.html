@@ -68,13 +68,12 @@
         </p>
       </li>
       <li>
-        <h3>Turn on Input Monitoring</h3>
+        <h3>Turn on Input Monitoring, if you want it</h3>
         <p>
-          Same place, one row down. macOS guards raw key and mouse taps
-          separately from the switch above, which catches people out. This is
-          what makes the double-tap gesture fire, and what lets the explain
-          popup notice you clicking away from it.
-          <span class="more">Skip it and everything else still works. You just use <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> and close the popup with its own button.</span>
+          Same place, one row down. macOS guards raw mouse taps separately from
+          the switch above, which catches people out. All this one does now is
+          let the explain popup notice you clicking away from it.
+          <span class="more">Skip it and everything still works. The popup closes when you switch to another app, or with its own close button.</span>
         </p>
       </li>
       <li>
@@ -207,7 +206,7 @@
     <h2 id="explain">The explain thing</h2>
 
     <p>
-      Highlight anything, anywhere, tap <kbd>Cmd</kbd> twice, and a small window
+      Highlight anything, anywhere, press <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd>, and a small window
       tells you what it says. It reads the screen around your selection first, so
       it knows a loose symbol belongs to the formula three lines up.
     </p>
@@ -226,9 +225,6 @@
 
       <dt>Explain says nothing is selected, but I selected something.</dt>
       <dd>Accessibility is off, or it is on for an older copy of the app. Turn it on, then quit Casrion from the menu bar and reopen it. A few apps also genuinely keep their selection to themselves, and Casrion will say so when that is what happened.</dd>
-
-      <dt>Double-tapping Cmd does nothing.</dt>
-      <dd>That is Input Monitoring, which is a separate switch from Accessibility. Same pane, one row down. <kbd>Cmd</kbd><kbd>Shift</kbd><kbd>E</kbd> works without it.</dd>
 
       <dt>The explain popup will not go away when I click somewhere.</dt>
       <dd>Same switch. Noticing a click outside its own window is exactly the thing Input Monitoring governs. Turn it on, then quit and reopen. Casrion spots this happening and offers you the settings pane from inside the popup.</dd>

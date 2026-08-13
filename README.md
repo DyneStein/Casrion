@@ -47,7 +47,7 @@ xattr -cr /Applications/Casrion.app
 Then open it normally. Casrion will also ask for two permissions in System Settings > Privacy & Security:
 
 - **Accessibility**, so it can read the text you have selected in other apps.
-- **Input Monitoring**, so the double-tap shortcut and click-away dismissal work.
+- **Input Monitoring**, so clicking away dismisses the explain popup. Optional: everything else works without it.
 
 These are separate permissions and macOS grants them separately. The [macOS guide](https://casrion.com/mac) walks through it with screenshots.
 </details>
@@ -80,7 +80,7 @@ Every shortcut below is global. They work while you are in Chrome, a PDF, Word, 
 | Undo / redo the last capture | `Ctrl Shift Z` / `Y` | `Cmd Shift Z` / `Y` |
 | Show every shortcut | `Ctrl Shift H` | `Cmd Shift H` |
 
-**Explain a selection.** Highlight anything, tap `Ctrl` twice (`Cmd` on macOS), and a small window tells you what it says. It OCRs the screen around your selection first, so it knows a loose symbol belongs to the formula three lines up. Runs on a local model, so it works on a plane and nothing you highlight leaves the machine.
+**Explain a selection.** Highlight anything, press `Ctrl+Shift+E` (`Cmd+Shift+E` on macOS), and a small window tells you what it says. It OCRs the screen around your selection first, so it knows a loose symbol belongs to the formula three lines up. Runs on a local model, so it works on a plane and nothing you highlight leaves the machine.
 
 ---
 

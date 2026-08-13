@@ -76,7 +76,7 @@ Ad-hoc signed is not notarised, so users still need `xattr -cr /Applications/Cas
 
 **Info.plist usage strings** are set through `mac.extendInfo` in `package.json`. macOS kills the app on the spot if it touches the microphone or sends an Apple Event without the matching usage string present, so if you add a capability that needs a permission, add its string at the same time.
 
-**Testing the packaged build:** mount the DMG, drag the app to Applications, run the `xattr` command, then launch. Verify the tray icon appears, grant Accessibility and Input Monitoring when asked, and confirm the double-tap `Cmd` explain shortcut works. The permission prompts are the most common thing to break, and they cannot be tested from the unpacked build.
+**Testing the packaged build:** mount the DMG, drag the app to Applications, run the `xattr` command, then launch. Verify the tray icon appears, grant Accessibility when asked, and confirm `Cmd+Shift+E` explains a selection made in another app. The permission prompts are the most common thing to break, and they cannot be tested from the unpacked build.
 
 ---
 

@@ -1,16 +1,23 @@
-// Explain anywhere: select text in any app, double-tap Ctrl (or hit
-// Ctrl+Shift+E), and a small popup near the selection explains it in plain
-// language using the local model. Selection text and coordinates come from
-// the selection-hook native addon (UI Automation), page context comes from
-// the title helper plus a quick OCR of the pixels around the selection.
+// Explain anywhere: select text in any app, hit Ctrl+Shift+E (Cmd+Shift+E on
+// macOS), and a small popup near the selection explains it in plain language
+// using the local model. Selection text and coordinates come from the
+// selection-hook native addon (UI Automation), page context comes from the
+// title helper plus a quick OCR of the pixels around the selection.
+//
+// There used to be a second way in: tapping the bare modifier key twice. It is
+// gone on purpose. The gesture needed the global keyboard tap, which on macOS
+// means Input Monitoring, a permission most people never granted, and when it
+// is missing the gesture fails silently: no popup, no error, nothing to tell
+// you which of the two permissions you were missing. The chord needs no
+// permission at all because Electron registers it with the window server, so
+// it works the moment the app starts. One way in that always works beats two
+// where the nicer one usually does not.
 const path = require('path');
 const { BrowserWindow, screen, ipcMain, systemPreferences } = require('electron');
 const llm = require('./llm.cjs');
 const ocr = require('./ocr.cjs');
 
 const IS_MAC = process.platform === 'darwin';
-// The gesture key: Ctrl on Windows, Cmd on Mac (uniKey follows MDN key values)
-const TAP_KEY = IS_MAC ? 'Meta' : 'Control';
 const INVALID_COORD = -99999;
 
 // The selection hook's clipboard fallback is OFF everywhere, and must stay off.
@@ -41,8 +48,8 @@ const INVALID_COORD = -99999;
  *
  * Giving it up costs nothing, because nothing in here wants a selection until
  * the user asks for one. triggerExplain reads it on demand through
- * getCurrentSelection(). One read when somebody double-taps, instead of one
- * read every time anybody selects any text in any application, forever.
+ * getCurrentSelection(). One read when somebody presses the shortcut, instead
+ * of one read every time anybody selects any text in any application, forever.
  *
  * Do not turn this off to "fix" a missed selection. Fix the on-demand read.
  */
@@ -241,46 +248,9 @@ function initSelectionHook(promptForTrust) {
         hideExplain();
       }
     });
-    // Double-tap Ctrl (Cmd on Mac) triggers explain: one key, no chord to
-    // remember, and it collides with nothing because the bare modifier does
-    // nothing anywhere. A tap only counts when the key went down and back up
-    // with no other key in between, so copy/paste chords and held-key
-    // auto-repeat never fire it.
-    let tapDownAt = 0;       // 0 while the key is up (also gates auto-repeat)
-    let tapDirty = false;    // another key was pressed while it was held
-    let lastCleanTapUp = 0;
-    hook.on('key-down', (e) => {
-      if (e.uniKey === TAP_KEY) {
-        if (tapDownAt) return; // auto-repeat of a held modifier
-        tapDownAt = Date.now();
-        tapDirty = false;
-        if (lastCleanTapUp && tapDownAt - lastCleanTapUp < 400) {
-          lastCleanTapUp = 0;
-          triggerExplain();
-        }
-      } else {
-        tapDirty = true;
-        lastCleanTapUp = 0;
-      }
-    });
-    hook.on('key-up', (e) => {
-      if (e.uniKey !== TAP_KEY) return;
-      if (tapDownAt && !tapDirty && Date.now() - tapDownAt < 400) {
-        lastCleanTapUp = Date.now();
-        // Prewarming used to hang off text-selection, which passive mode no
-        // longer emits. A bare modifier tap is a better signal anyway: it
-        // means somebody is halfway through asking a question, where selecting
-        // text only ever meant they were reading.
-        //
-        // Deferred past the double-tap window on purpose. Loading the model
-        // is asynchronous, but it is still work on this thread, and the second
-        // tap has to be noticed within 400ms or the gesture is lost. If the
-        // tap does complete, the real run is already loading by the time this
-        // fires and every guard inside turns it into a no-op.
-        setTimeout(maybePrewarm, 450);
-      }
-      tapDownAt = 0;
-    });
+    // No key-down/key-up subscription any more. The only thing that ever
+    // listened was the double-tap gesture, and prewarming hung off the same
+    // signal. Both are gone, so nothing here reads your keystrokes.
     hook.on('error', (err) => console.error('[Casrion] selection-hook:', err && err.message));
     hook.on('status', (s) => console.log('[Casrion] selection-hook status:', s));
     const ok = hook.start(HOOK_START_OPTS);
@@ -365,39 +335,74 @@ function warmUp() {
   // to know what was selected before its first use. The popup window, the OCR
   // helper and the model were all being warmed on a launch timer whether or not
   // the user ever asked for anything, which came to ~1.9GB and dwarfed the
-  // whole rest of the app. They start on intent now; see maybePrewarm.
+  // whole rest of the app. They start on the first real question instead.
   initSelectionHook();
+  warnIfUpdateDroppedPermission();
 }
 
-let prewarmed = false;
-
-// Selecting text is the one cheap hint that a question might be coming. Only
-// once per run, and only for someone who has explained something at least once
-// before, does that hint start the load early, so their first double-tap still
-// answers straight away. Someone who never uses the feature never pays a byte,
-// and the once-per-run guard keeps ordinary text selection from dragging the
-// model back in every few minutes for the rest of the day.
-function maybePrewarm() {
-  if (prewarmed || !deps || !isEnabled()) return;
-  if (!deps.getSettings().explainUsed) return;
-  prewarmed = true;
-  // Each of these is warmed here rather than at launch, and each has an
-  // on-demand backstop if the hotkey gets there first: triggerExplain builds
-  // the window, ocrRegion starts the helper, ensureLoaded loads the model.
-  if (!explainWindow || explainWindow.isDestroyed()) createExplainWindow();
-  // The OCR helper is a whole PowerShell process (~70MB) and it has to be up
-  // before the first question, since its screenshot has to beat the popup's paint.
-  ocr.startOcrHelper();
-  if (llm.hasModelFile()) {
-    llm.prewarm().catch(() => { /* the first real question loads it instead */ });
+/**
+ * Every Casrion update silently revokes Accessibility, and macOS does not say so.
+ *
+ * There is no Apple Developer certificate, so the app is signed ad-hoc and its
+ * Designated Requirement is the cdhash of that exact binary:
+ *
+ *   codesign -d -r- /Applications/Casrion.app
+ *   # designated => cdhash H"62b121..."
+ *
+ * TCC stores that requirement next to the grant. A new build has a new cdhash,
+ * so the stored requirement stops matching a binary at the same path with the
+ * same bundle id, and the grant quietly stops applying. Measured directly: the
+ * same machine reported trusted for 1.0.2 and not trusted for 1.0.3 within
+ * minutes, with nobody touching System Settings in between.
+ *
+ * What makes it worse than a permission you never granted is that System
+ * Settings keeps showing Casrion in the list with the switch still on, so the
+ * one place anybody would look says everything is fine. Toggling that switch
+ * does not help either: it rewrites the answer, not the requirement the answer
+ * was recorded against. Only removing the row and adding the app back does.
+ *
+ * So the app has to notice on its own. Once per version, and only when an
+ * earlier version really did run here, which keeps a fresh install (where
+ * nothing has been granted yet, and the popup already explains that) quiet.
+ */
+function warnIfUpdateDroppedPermission() {
+  if (!IS_MAC || !deps) return;
+  let version = '';
+  try { version = require('electron').app.getVersion(); } catch { return; }
+  const settings = deps.getSettings();
+  const seen = settings.lastVersionSeen;
+  if (seen !== version) {
+    settings.lastVersionSeen = version;
+    deps.saveSettings();
   }
+  // A first run on this machine has nothing to have lost.
+  if (!seen || seen === version) return;
+  // Give the hook a moment: refreshMacTrust runs inside initSelectionHook, and
+  // a grant that survived would report by now.
+  setTimeout(() => {
+    if (!hook || !macNeedsAccessibility()) return;
+    // The toast is one line with an ellipsis past ~600px, so this has to stay
+    // short. The full instructions live in the explain popup, which is where
+    // somebody lands the moment they try to use the thing that broke.
+    deps.showOverlayNotification('Update dropped Casrion from Accessibility. Grant it again', 'error', 6000);
+  }, 4000);
 }
+
+// There is no prewarming any more. It only ever had one trigger, a bare tap of
+// the modifier key, and that went with the double-tap gesture. Every remaining
+// candidate signal is either useless (the chord itself, which arrives at the
+// same moment as the work it would be racing) or unacceptable (prewarming on
+// any click anywhere, which is what the mouse hook sees).
+//
+// So the first question of a session pays for the window, the OCR helper and
+// the model load, and every question after it finds them up. That cost was
+// already being paid by anyone whose tap had not fired first, which on macOS
+// was anyone without Input Monitoring: most people.
 
 function markExplainUsed() {
   const settings = deps.getSettings();
   if (settings.explainUsed) return;
   settings.explainUsed = true;
-  prewarmed = true; // it is loading for this very question already
   deps.saveSettings();
 }
 
@@ -503,9 +508,25 @@ function beginRun(sel) {
     showNow();
     // On macOS an empty read usually means Accessibility was never granted,
     // not that nothing is selected; guide the user instead of misleading them.
-    send('explain-status', macNeedsAccessibility()
-      ? { state: 'need-permission' }
-      : { state: 'no-selection' });
+    if (macNeedsAccessibility()) {
+      send('explain-status', { state: 'need-permission' });
+      return;
+    }
+    send('explain-status', { state: 'no-selection' });
+    // Name the app the read actually went to. "Nothing selected" on its own is
+    // a dead end, because it cannot distinguish an app that keeps its selection
+    // private from a read that was pointed at the wrong app entirely. If this
+    // comes back naming Casrion, or the login window, that is the second bug
+    // and not the first. Only runs when the read already failed, so it costs
+    // nothing on the path that works.
+    if (IS_MAC && deps.getForegroundSourceInfo) {
+      Promise.resolve(deps.getForegroundSourceInfo(800))
+        .then((info) => {
+          if (runId !== currentRun) return;
+          if (info && info.app) send('explain-status', { state: 'no-selection', app: info.app });
+        })
+        .catch(() => { /* the plain message stands */ });
+    }
     return;
   }
   if (!llm.hasModelFile()) {
