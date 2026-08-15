@@ -4,6 +4,7 @@ import Sidebar from './Sidebar.jsx';
 import Viewer from './Viewer.jsx';
 import Editor from './Editor.jsx';
 import HelpPanel from './HelpPanel.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import './index.css';
 
 function App() {
@@ -351,31 +352,43 @@ function App() {
         </div>
       </header>
 
+      {/* Each region gets its own boundary so a failure costs that region and
+          not the window. The document one resets when the note changes, so
+          switching away and back recovers without a restart. */}
       <div className="main-layout">
-          <Sidebar
-            workspace={workspace}
-            activeFilePath={activeFilePath}
-            onAddFolder={handleAddFolder}
-            onRemoveFolder={handleRemoveFolder}
-            onDeleteFolder={handleDeleteFolder}
-            onDeleteFile={handleDeleteFile}
-            onCreateFile={handleCreateFile}
-            onSelectFile={handleSelectFile}
-          />
-        {!isLoaded ? (
-          <div className="viewer" />
-        ) : isEditMode ? (
-          <Editor
-            content={content}
-            onContentChange={handleContentChange}
-          />
-        ) : (
-          <Viewer
-            content={content}
-            insertionLine={insertionLine}
-            onSetInsertionLine={handleSetInsertionLine}
-          />
-        )}
+          <ErrorBoundary label="Sidebar" title="The file list hit a problem">
+            <Sidebar
+              workspace={workspace}
+              activeFilePath={activeFilePath}
+              onAddFolder={handleAddFolder}
+              onRemoveFolder={handleRemoveFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onDeleteFile={handleDeleteFile}
+              onCreateFile={handleCreateFile}
+              onSelectFile={handleSelectFile}
+            />
+          </ErrorBoundary>
+        <ErrorBoundary
+          label={isEditMode ? 'Editor' : 'Viewer'}
+          resetKey={`${activeFilePath}:${isEditMode}`}
+          title="This note could not be displayed"
+          hint="The note itself is fine on disk. Switching to edit mode shows its text as it was written, which is usually enough to spot what upset the reader."
+        >
+          {!isLoaded ? (
+            <div className="viewer" />
+          ) : isEditMode ? (
+            <Editor
+              content={content}
+              onContentChange={handleContentChange}
+            />
+          ) : (
+            <Viewer
+              content={content}
+              insertionLine={insertionLine}
+              onSetInsertionLine={handleSetInsertionLine}
+            />
+          )}
+        </ErrorBoundary>
       </div>
 
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}

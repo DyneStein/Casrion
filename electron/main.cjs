@@ -241,10 +241,41 @@ function listMdFiles(folderPath) {
   }
 }
 
+// A note may have been written by something other than Casrion. Notepad and
+// a good few PowerShell one-liners still save UTF-16, and plenty of tools add
+// a UTF-8 byte order mark. Read as UTF-8 regardless and a UTF-16 file comes
+// back as text split by NUL bytes, which looks to everyone downstream like a
+// note full of gibberish. Decode by what the bytes actually say instead.
+function decodeNote(buf) {
+  if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) return buf.toString('utf16le', 2);
+  if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) return buf.swap16().toString('utf16le', 2);
+  if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) return buf.toString('utf8', 3);
+  return buf.toString('utf8');
+}
+
+// Antivirus and OneDrive both take a brief exclusive lock on a file just
+// after it changes, which is exactly when this runs. A read that loses that
+// race used to return "" and the note looked empty; in edit mode the next
+// keystroke would then save that emptiness over the real thing. Spin a few
+// times before believing it.
+function readNoteBytes(filePath) {
+  let lastErr;
+  for (let i = 0; i < 4; i++) {
+    try {
+      return fs.readFileSync(filePath);
+    } catch (e) {
+      lastErr = e;
+      const until = Date.now() + 40 * (i + 1);
+      while (Date.now() < until) { /* the caller is synchronous everywhere */ }
+    }
+  }
+  throw lastErr;
+}
+
 function readFileContent(filePath) {
   try {
     if (filePath && fs.existsSync(filePath)) {
-      let content = fs.readFileSync(filePath, 'utf-8');
+      let content = decodeNote(readNoteBytes(filePath));
 
       // Normalize CRLF so line-based insertion math is consistent
       // (files edited externally in Notepad etc. arrive with \r\n)
@@ -252,6 +283,7 @@ function readFileContent(filePath) {
 
       // Auto-migrate legacy absolute paths to the new relative pathing system
       const originalContent = content;
+      try {
       // Handle both Markdown format and HTML src format (for file:/// and
       // casrion://). The optional third slash also catches hydrated
       // "casrion://C:/..." URLs that an older editor build saved to disk.
@@ -282,12 +314,29 @@ function readFileContent(filePath) {
         /\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g,
         (span) => span.replace(/\\\\(?=[A-Za-z])/g, '\\')
       );
-
-      if (content !== originalContent) {
-        writeFileAtomic(filePath, content, 'utf-8');
-        console.log(`[Casrion] Auto-migrated legacy paths in ${filePath}`);
+      } catch (e) {
+        // Healing a note is a convenience. Showing it is not. Whatever odd
+        // input tripped a pattern up, the text itself is still perfectly
+        // readable, so fall back to it rather than failing the whole read.
+        console.warn('[Casrion] Skipped healing this note:', e.message);
+        content = originalContent;
       }
-      
+
+      // These migrations rewrite the user's file, so they get one guard the
+      // rest of the read does not. A note is the only copy of something
+      // somebody sat and wrote; a regex that misfires on odd input must cost
+      // a redundant migration, never the text. If the result lost a large
+      // part of the note, distrust the result and leave the file alone.
+      if (content !== originalContent) {
+        if (content.trim().length < originalContent.trim().length * 0.5) {
+          console.warn(`[Casrion] Migration would have dropped most of ${filePath}, keeping the file as it was`);
+          content = originalContent;
+        } else {
+          writeFileAtomic(filePath, content, 'utf-8');
+          console.log(`[Casrion] Auto-migrated legacy paths in ${filePath}`);
+        }
+      }
+
       return content;
     }
   } catch (e) {
@@ -2310,6 +2359,19 @@ function registerIPC() {
   let lastEditorUndoPush = 0;
   ipcMain.handle('save-file-content', (_event, { content }) => {
     if (!activeFilePath) return { error: 'No active file' };
+    // A save that empties a note that was not empty is either a deliberate
+    // select-all-and-delete or a bug upstream, and there is no way to tell
+    // them apart from here. Always snapshot first: the deliberate one loses
+    // nothing by it, and the other one becomes a single Ctrl+Z.
+    const emptying = !String(content || '').trim();
+    if (emptying) {
+      try {
+        if (fs.statSync(activeFilePath).size > 0) {
+          pushUndo();
+          lastEditorUndoPush = Date.now();
+        }
+      } catch { /* the file is gone; the write below will report it */ }
+    }
     // Editor saves arrive continuously while typing; snapshot at most every
     // 15s so the undo stack isn't flooded by a single editing session.
     const now = Date.now();
