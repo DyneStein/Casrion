@@ -2345,6 +2345,7 @@ function registerIPC() {
       // Casrion writes, but a note that picked up anything else would silently
       // export with a relative src pointing at a folder the reader does not have.
       const audioRegex = /<audio\b[^>]*\bsrc="([^"]+)"[^>]*>\s*<\/audio>/g;
+      let inlinedAudio = false;
       content = content.replace(audioRegex, (match, uri) => {
         try {
           let audioFile = null;
@@ -2358,12 +2359,17 @@ function registerIPC() {
             // extension pasted in raw ("audio/m4a") is not a media type.
             const mime = ASSET_MIME[path.extname(audioFile).toLowerCase()] || 'audio/webm';
             const base64 = fs.readFileSync(audioFile).toString('base64');
-            // preload="auto" is not cosmetic. Without it phone browsers pick
+            // preload="auto" is not cosmetic. Left off, phone browsers pick
             // preload="none" to save data, so the first tap on play only starts
             // decoding the clip and does nothing audible, and the second tap is
             // the one that plays. The bytes are already inside the file by this
             // point, so there is no download to defer and nothing to save.
             // Viewer.jsx makes the same choice for local files, for the same reason.
+            //
+            // preload is only a hint, though, and phones are entitled to ignore
+            // it. AUDIO_FIRST_TAP_SCRIPT below is what actually fixes the first
+            // tap; this attribute is what a reader with scripts turned off gets.
+            inlinedAudio = true;
             return `<audio controls preload="auto" src="data:${mime};base64,${base64}"></audio>`;
           }
         } catch (e) {
@@ -2441,6 +2447,7 @@ function registerIPC() {
   <div class="document-container">
     ${htmlContent}
   </div>
+${inlinedAudio ? AUDIO_FIRST_TAP_SCRIPT : ''}
 </body>
 </html>`;
 
@@ -2666,6 +2673,74 @@ const ASSET_MIME = {
   '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.pdf': 'application/pdf', '.txt': 'text/plain'
 };
+
+// Makes a voice memo in an exported document play on the FIRST tap.
+//
+// The export has to be one file, so a memo is embedded as a data: URI. To a
+// media player that is a resource to go and fetch, and a bad one: it cannot be
+// range requested, its length is not known until the whole base64 string has
+// been decoded, and phone browsers deliberately ignore preload on anything
+// that looks like a download. So the first tap was spent loading and made no
+// sound, and the second tap, by which time the data had arrived, played.
+//
+// Handing the player a blob: URL instead gives it a real object that is
+// already in memory, with a media type it can trust, so it is ready long
+// before anyone taps. The naive fix is to add preload="auto" and stop there,
+// which is a hint the phone is free to ignore, and it does.
+//
+// Anything that refuses blob URLs (some in-app webviews inside chat apps)
+// keeps the data: URI it already had and behaves exactly as it did before,
+// which is why the conversion is per element and inside a try.
+const AUDIO_FIRST_TAP_SCRIPT = `<script>
+(function () {
+  var players = document.querySelectorAll('audio');
+  for (var i = 0; i < players.length; i++) {
+    bridgeFirstTap(players[i]);
+    toBlobUrl(players[i]);
+  }
+
+  function toBlobUrl(el) {
+    var src = el.getAttribute('src') || '';
+    var comma = src.indexOf(',');
+    if (src.slice(0, 5) !== 'data:' || comma < 0) return;
+    var head = src.slice(5, comma);
+    if (head.indexOf(';base64') < 0) return;
+    try {
+      var binary = atob(src.slice(comma + 1));
+      var bytes = new Uint8Array(binary.length);
+      for (var j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+      el.src = URL.createObjectURL(new Blob([bytes], { type: head.split(';')[0] }));
+      el.load();
+    } catch (e) {
+      /* keep the data: URI: a memo that needs two taps beats one that is gone */
+    }
+  }
+
+  // Belt and braces for a player that accepts the tap while it is still
+  // loading and then quietly gives up rather than starting when the data
+  // lands. Ask it once more, and only then: the tap has already unlocked
+  // this element, so the second ask is allowed without another gesture.
+  // Armed only by a play that began too early, disarmed by real playback,
+  // by a pause (that is the reader changing their mind) and after 3s, so
+  // it can never resume something later on its own.
+  function bridgeFirstTap(el) {
+    var pending = false;
+    el.addEventListener('play', function () {
+      if (el.readyState >= 3) return;
+      pending = true;
+      setTimeout(function () { pending = false; }, 3000);
+    });
+    el.addEventListener('playing', function () { pending = false; });
+    el.addEventListener('pause', function () { pending = false; });
+    el.addEventListener('canplay', function () {
+      if (!pending || !el.paused) return;
+      pending = false;
+      var p = el.play();
+      if (p && p.catch) p.catch(function () {});
+    });
+  }
+})();
+<\/script>`;
 
 // Read an asset with retries. Freshly captured files are often briefly
 // locked by antivirus/indexing services (EBUSY/EPERM) right when the
