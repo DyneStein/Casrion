@@ -3,12 +3,12 @@
   "redirects": [
     {
       "source": "/get",
-      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.6/Casrion-Setup-1.0.6.exe",
+      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-Setup-1.0.7.exe",
       "statusCode": 302
     },
     {
       "source": "/get-mac",
-      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.6/Casrion-1.0.6-arm64.dmg",
+      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-1.0.7-arm64.dmg",
       "statusCode": 302
     }
   ]
