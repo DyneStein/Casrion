@@ -3,7 +3,7 @@
   "redirects": [
     {
       "source": "/get",
-      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.3/Casrion-Setup-1.0.3.exe",
+      "destination": "https://github.com/DyneStein/Casrion/releases/download/v1.0.4/Casrion-Setup-1.0.4.exe",
       "statusCode": 302
     },
     {
