@@ -12,6 +12,11 @@ import { ChevronRight, List, X, Link2 } from 'lucide-react';
 // rendered as text — they become right-click metadata on the blocks below.
 const STAMP_RE = /^<sub[^>]*>\s*(?:Source:\s*|📎\s*)?([\s\S]*?)<\/sub>\s*$/;
 
+// Lines Casrion writes itself: a screenshot, a source stamp, a voice memo.
+// None of them can legitimately sit inside a captured code block, so one of
+// these is where an unterminated fence has to stop.
+const APP_WRITTEN_RE = /^(!\[|<sub[\s>]|<audio[\s>])/;
+
 /**
  * One malformed block (broken raw HTML, hostile TeX, etc.) must never blank
  * the whole document — render that block as plain text and keep going.
@@ -301,18 +306,33 @@ function parseBlocks(content) {
 
     // ── Code fence block ────────────────────────
     if (line.trimStart().startsWith('```')) {
-      const startLine = i;
-      const blockLines = [line];
-      i++;
-      while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
-        blockLines.push(lines[i]);
-        i++;
+      // A fence with no partner used to run to the end of the file, and
+      // everything under it rendered as literal text: screenshots turned
+      // back into their own paths, math into raw TeX, for the rest of the
+      // note. One stray ``` (an explain answer cut off mid-block, half a
+      // code sample copied off a page) was enough to do it.
+      //
+      // So look for the closing fence, but stop looking at the first line
+      // the app itself wrote. A screenshot, a source stamp or a voice memo
+      // is never inside a captured code block, so one appearing first means
+      // this fence was never closed, and the safe reading is to treat the
+      // marker as ordinary text and keep parsing. A fence that simply runs
+      // to the end of the file with nothing structural below still becomes
+      // a code block, which is what markdown says and costs nothing.
+      let close = -1;
+      let boundary = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        if (lines[j].trimStart().startsWith('```')) { close = j; break; }
+        if (APP_WRITTEN_RE.test(lines[j].trimStart())) { boundary = j; break; }
       }
-      if (i < lines.length) {
-        blockLines.push(lines[i]); // closing ```
+      if (close === -1 && boundary !== -1) {
+        blocks.push({ type: 'paragraph', text: line, startLine: i, endLine: i });
         i++;
+        continue;
       }
-      blocks.push({ type: 'code', text: blockLines.join('\n'), startLine, endLine: i - 1 });
+      const endLine = close === -1 ? lines.length - 1 : close;
+      blocks.push({ type: 'code', text: lines.slice(i, endLine + 1).join('\n'), startLine: i, endLine });
+      i = endLine + 1;
       continue;
     }
 

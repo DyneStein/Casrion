@@ -306,6 +306,7 @@ function getLines() {
 function appendToLine(text, lineNum) {
   if (!activeFilePath) return -1;
   const lines = getLines();
+  lineNum = escapeCodeFence(lines, lineNum);
 
   // Split multiline text into an array of lines
   const textLines = text.split(/\r?\n/);
@@ -316,7 +317,7 @@ function appendToLine(text, lineNum) {
   // source stamp, voice memo or other HTML block, auto-push to new line.
   // Stamps especially must stay alone on their line — text glued onto one
   // stops the viewer from hiding it.
-  const smartRegex = /^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?|!\[|<sub|<audio|<\/?div)/;
+  const smartRegex = /^(#{1,6}\s|[-*]\s|\d+\.\s|>\s?|!\[|<sub|<audio|<\/?div|```)/;
 
   if (lineNum >= 0 && lineNum < lines.length && smartRegex.test(lines[lineNum])) {
     // Current line is a structural block. Insert below it with one blank
@@ -365,12 +366,32 @@ function appendToLine(text, lineNum) {
   }
 }
 
+// A capture must never land inside a fenced code block. Markdown reads
+// everything between the fences literally, so a screenshot written in there
+// shows up as its own path and captured math as raw TeX, and it looks like
+// the capture was lost. Count the fences above the target line; if it sits
+// inside one, step down to the line that closes the block (or the end of the
+// file when nothing does) and write after that instead.
+function escapeCodeFence(lines, lineNum) {
+  if (lineNum < 0 || lineNum >= lines.length) return lineNum;
+  let inside = false;
+  for (let i = 0; i <= lineNum; i++) {
+    if (lines[i].trimStart().startsWith('```')) inside = !inside;
+  }
+  if (!inside) return lineNum;
+  for (let i = lineNum + 1; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith('```')) return i;
+  }
+  return lines.length - 1;
+}
+
 // Insert a NEW line after the insertion point (for headings, images, new paragraphs).
 // Blank-aware: reuses empty lines already at the target instead of stacking more,
 // so repeated Ctrl+Shift+N presses or blank-line targets never inflate spacing.
 function insertNewLineAfter(text, lineNum) {
   if (!activeFilePath) return -1;
   const lines = getLines();
+  lineNum = escapeCodeFence(lines, lineNum);
   const textLines = text.split(/\r?\n/);
 
   if (lineNum < 0 || lineNum >= lines.length) {
