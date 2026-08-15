@@ -2691,6 +2691,11 @@ const ASSET_MIME = {
 // Anything that refuses blob URLs (some in-app webviews inside chat apps)
 // keeps the data: URI it already had and behaves exactly as it did before,
 // which is why the conversion is per element and inside a try.
+//
+// That is the whole fix on Chrome, Brave and Safari on a Mac, where the memo
+// is ready in under 200ms measured. Safari on a phone needs the second half
+// below, because it refuses to touch a media file until the reader has
+// touched the page, so nothing above it has run by the time they tap play.
 const AUDIO_FIRST_TAP_SCRIPT = `<script>
 (function () {
   var players = document.querySelectorAll('audio');
@@ -2698,6 +2703,7 @@ const AUDIO_FIRST_TAP_SCRIPT = `<script>
     bridgeFirstTap(players[i]);
     toBlobUrl(players[i]);
   }
+  warmOnFirstTouch(players);
 
   function toBlobUrl(el) {
     var src = el.getAttribute('src') || '';
@@ -2738,6 +2744,32 @@ const AUDIO_FIRST_TAP_SCRIPT = `<script>
       var p = el.play();
       if (p && p.catch) p.catch(function () {});
     });
+  }
+
+  // Safari on a phone will not load a media file until the reader has touched
+  // the page, whatever preload says, so the memo is still untouched when they
+  // reach the play button and that tap pays for the whole decode. Measured on
+  // a Mac the memo is ready 186ms after the page opens; on a phone the reader
+  // waits seconds, then taps again.
+  //
+  // Their first touch anywhere, a scroll or a tap on the text, is a gesture
+  // Safari accepts, so start the decode there. By the time the thumb reaches
+  // play the memo is ready. A reader whose very first touch IS the play
+  // button gets exactly what they get today, which is why the player itself
+  // is skipped: calling load() on it there would restart the load it just began.
+  function warmOnFirstTouch(list) {
+    if (!list.length) return;
+    var warm = function (e) {
+      document.removeEventListener('touchstart', warm, true);
+      document.removeEventListener('mousedown', warm, true);
+      for (var i = 0; i < list.length; i++) {
+        var el = list[i];
+        if (e && e.target === el) continue;
+        if (el.readyState === 0 && el.paused) el.load();
+      }
+    };
+    document.addEventListener('touchstart', warm, true);
+    document.addEventListener('mousedown', warm, true);
   }
 })();
 <\/script>`;
