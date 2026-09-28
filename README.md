@@ -8,13 +8,13 @@
 
 Casrion sits in your tray. You select something in any app, press one key, and it lands in a Markdown file with the page and the time already stamped on it. You never alt-tab, you never lose your place.
 
-### [Download for Windows](https://casrion.com/get) &nbsp;·&nbsp; [Download for Mac](https://casrion.com/get-mac)
+### [Download for Windows](https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-Setup-1.0.7.exe) &nbsp;·&nbsp; [Download for Mac](https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-1.0.7-arm64.dmg)
 
 Those two links start the download straight away. No sign up, no account, no email.
 
 Windows 10/11 · macOS 11+ (Apple Silicon) · GPL-3.0 · no telemetry, no cloud
 
-[casrion.com](https://casrion.com) · [Windows guide](https://casrion.com/windows) · [macOS guide](https://casrion.com/mac) · [All releases](https://github.com/DyneStein/Casrion/releases)
+[Installing it](#installing-it) · [The keys](#the-keys) · [All releases](https://github.com/DyneStein/Casrion/releases)
 
 </div>
 
@@ -35,8 +35,6 @@ xattr -cr /Applications/Casrion.app
 Then open it normally. macOS will also ask for **Accessibility** in System Settings > Privacy & Security, which is how Casrion reads the text you have selected in other apps. **Input Monitoring** is optional: without it everything works, you just have to close the explain popup with its own button instead of by clicking away.
 
 One macOS thing that catches people out on every update. Because there is no Apple certificate, the permission you granted is tied to that exact copy of the app, so a new version does not inherit it. System Settings will keep showing the switch as on while it has quietly stopped applying, and toggling it does nothing. Select Casrion in the list, remove it with the minus button, add it back with plus, then quit and reopen. Casrion notices this itself now and tells you.
-
-The [macOS guide](https://casrion.com/mac) walks through all of it with screenshots.
 
 ---
 
@@ -138,7 +136,7 @@ If you want to understand the codebase before changing it, start with **[docs/AR
 ├── src/            React renderer: editor, viewer, sidebar, help panel
 ├── build/          installer icons and NSIS resources
 ├── scripts/        build helpers (obfuscation pass, macOS ad-hoc signing)
-├── website/        casrion.com, a static site with no build step
+├── website/        the old project site, static with no build step
 └── .github/        the macOS DMG build workflow
 ```
 
@@ -159,4 +157,4 @@ Issues and pull requests are welcome. A few things worth knowing before you open
 
 [GPL-3.0](LICENSE). You can read it, run it, fork it and ship it. If you distribute a modified version, that version has to stay open source too.
 
-Built by [DyneStein](https://github.com/DyneStein). Something broken? Open an issue or email hello@casrion.com.
+Built by [DyneStein](https://github.com/DyneStein). Something broken? [Open an issue](https://github.com/DyneStein/Casrion/issues).
