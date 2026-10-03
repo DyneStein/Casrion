@@ -8,7 +8,7 @@
 
 Casrion sits in your tray. You select something in any app, press one key, and it lands in a Markdown file with the page and the time already stamped on it. You never alt-tab, you never lose your place.
 
-### [Download for Windows](https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-Setup-1.0.7.exe) &nbsp;·&nbsp; [Download for Mac](https://github.com/DyneStein/Casrion/releases/download/v1.0.7/Casrion-1.0.7-arm64.dmg)
+### [Download for Windows](https://github.com/DyneStein/Casrion/releases/download/v1.0.8/Casrion-Setup-1.0.8.exe) &nbsp;·&nbsp; [Download for Mac](https://github.com/DyneStein/Casrion/releases/download/v1.0.8/Casrion-1.0.8-arm64.dmg)
 
 Those two links start the download straight away. No sign up, no account, no email.
 
