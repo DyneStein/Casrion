@@ -153,8 +153,43 @@ function protectForEditor(md) {
   return segments.join('');
 }
 
-function Editor({ content, onContentChange }) {
+// Caret position as a character offset into the editor's text, so it can be
+// put back after the DOM is rebuilt from a note that changed underneath it.
+function getCaretOffset(root) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  const before = document.createRange();
+  before.selectNodeContents(root);
+  before.setEnd(range.startContainer, range.startOffset);
+  return before.toString().length;
+}
+
+function setCaretOffset(root, offset) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  let left = offset;
+  while ((node = walker.nextNode())) {
+    if (left <= node.nodeValue.length) {
+      const range = document.createRange();
+      range.setStart(node, left);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    left -= node.nodeValue.length;
+  }
+}
+
+function Editor({ content, contentVersion, onContentChange }) {
   const editorRef = useRef(null);
+  // The editor's HTML as of the last load or save. Blur compares against it,
+  // so just clicking away no longer writes an unchanged note back through the
+  // HTML round trip (which reflows it and moves the capture insertion point).
+  const syncedHtmlRef = useRef('');
   const [activeStyles, setActiveStyles] = useState({});
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [tableRows, setTableRows] = useState(3);
@@ -241,19 +276,23 @@ function Editor({ content, onContentChange }) {
     };
   }, []);
 
+  // Refresh the DOM only when the note changed from outside the editor (a
+  // capture, an undo, another note); App bumps contentVersion for exactly
+  // those and never for the editor's own typing. This used to be decided by
+  // focus, which got one case wrong with teeth: a capture fired while Casrion
+  // itself had focus (Win+Shift+S then Ctrl+Shift+V, Ctrl+Shift+N) left the
+  // stale DOM on screen, and the next keystroke saved it over the capture.
+  // When the user is in the editor, the caret is put back where it was.
+  const contentRef = useRef(content);
+  contentRef.current = content;
   useEffect(() => {
     const el = editorRef.current;
-    // Refresh the DOM from content unless the user is actively typing here.
-    // document.activeElement alone is not enough: when the app window loses
-    // OS focus (user copies from another app), activeElement still points at
-    // the editor — but a background capture just changed the file, and keeping
-    // the stale DOM would overwrite that capture on the next keystroke.
-    const isActivelyEditing = document.hasFocus() &&
-      (document.activeElement === el || document.activeElement?.className === 'table-creator-input');
-    if (el && !isActivelyEditing) {
-      el.innerHTML = marked.parse(protectForEditor(content)) + '<p class="trapped-cursor-fix"><br></p>';
-    }
-  }, [content]);
+    if (!el) return;
+    const caret = document.hasFocus() && document.activeElement === el ? getCaretOffset(el) : null;
+    el.innerHTML = marked.parse(protectForEditor(contentRef.current)) + '<p class="trapped-cursor-fix"><br></p>';
+    syncedHtmlRef.current = el.innerHTML;
+    if (caret !== null) setCaretOffset(el, caret);
+  }, [contentVersion]);
 
   // queryCommandState('justifyCenter') misses blocks aligned via the align
   // attribute or -webkit-* values, so read the computed style of the block
@@ -302,12 +341,20 @@ function Editor({ content, onContentChange }) {
 
   const handleInput = () => {
     const html = editorRef.current.innerHTML;
+    syncedHtmlRef.current = html;
     const md = turndownService.turndown(html);
     onContentChange(md);
     // Typing moves text under the painted matches — repaint them
     if (findRef.current.open && findRef.current.query) {
       requestAnimationFrame(() => runFind(findRef.current.query, findRef.current.index));
     }
+  };
+
+  // Every edit already saves through handleInput. Blur only has to catch a
+  // change that slipped past it, and must not rewrite an untouched note.
+  const handleBlur = () => {
+    if (!editorRef.current || editorRef.current.innerHTML === syncedHtmlRef.current) return;
+    handleInput();
   };
 
   // Tab indents with four spaces (non-breaking, so markdown never mistakes
@@ -384,8 +431,10 @@ function Editor({ content, onContentChange }) {
   };
 
   const insertTable = () => {
-    // Restore the cursor position before inserting
-    if (savedSelection) {
+    // Restore the cursor position before inserting. A capture that landed
+    // while the popover was open rebuilt the DOM, which detaches the saved
+    // range; fall back to the end of the note rather than inserting nowhere.
+    if (savedSelection && editorRef.current.contains(savedSelection.startContainer)) {
       editorRef.current.focus();
       const sel = window.getSelection();
       sel.removeAllRanges();
@@ -465,9 +514,12 @@ function Editor({ content, onContentChange }) {
 
         <div className="toolbar-divider" />
 
-        <button className="toolbar-btn" onClick={() => formatDoc('fontSize', '2')} title="Small size. Select text, then click to shrink it"><Type size={16} strokeWidth={1.5} /></button>
-        <button className="toolbar-btn" onClick={() => formatDoc('fontSize', '3')} title="Normal size. Select text, then click to reset its size"><Type size={16} strokeWidth={1.5} /></button>
-        <button className="toolbar-btn" onClick={() => formatDoc('fontSize', '6')} title="Large size. Select text, then click to enlarge it"><Type size={16} strokeWidth={1.5} /></button>
+        {/* Three sizes of the same glyph, in buttons of one fixed size, so the
+            row reads small / normal / large at a glance. Stroke widths are
+            scaled against the icon size so all three lines look equally thick. */}
+        <button className="toolbar-btn toolbar-btn-size" onClick={() => formatDoc('fontSize', '2')} title="Small size. Select text, then click to shrink it"><Type size={11} strokeWidth={2.2} /></button>
+        <button className="toolbar-btn toolbar-btn-size" onClick={() => formatDoc('fontSize', '3')} title="Normal size. Select text, then click to reset its size"><Type size={15} strokeWidth={1.6} /></button>
+        <button className="toolbar-btn toolbar-btn-size" onClick={() => formatDoc('fontSize', '6')} title="Large size. Select text, then click to enlarge it"><Type size={20} strokeWidth={1.2} /></button>
 
         <div className="toolbar-divider" />
 
@@ -539,7 +591,7 @@ function Editor({ content, onContentChange }) {
           contentEditable={true}
           onPaste={handlePaste}
           onInput={handleInput}
-          onBlur={handleInput}
+          onBlur={handleBlur}
           onKeyDown={handleEditorKeyDown}
           suppressContentEditableWarning={true}
         />

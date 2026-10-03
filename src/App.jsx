@@ -11,6 +11,11 @@ function App() {
   const [workspace, setWorkspace] = useState([]);
   const [activeFilePath, setActiveFilePath] = useState(null);
   const [content, setContent] = useState('');
+  // Bumped whenever content arrives from outside the editor (a capture, an
+  // undo, another note), never by the editor's own typing. The editor reloads
+  // its DOM on this, so a capture is never left off screen and then
+  // overwritten by the next keystroke.
+  const [contentVersion, setContentVersion] = useState(0);
   const [insertionLine, setInsertionLine] = useState(-1);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -25,6 +30,11 @@ function App() {
     localStorage.setItem('casrion_dark_mode', JSON.stringify(isDarkMode));
     window.electronAPI?.setTitleBarTheme?.(isDarkMode);
   }, [isDarkMode]);
+
+  // The main process reminds the user on minimize that edit mode is still on
+  useEffect(() => {
+    window.electronAPI?.setEditMode?.(isEditMode);
+  }, [isEditMode]);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -52,6 +62,7 @@ function App() {
     setWorkspace(state.workspace || []);
     setActiveFilePath(state.activeFilePath ?? null);
     setContent(state.content ?? '');
+    setContentVersion((v) => v + 1);
     setInsertionLine(state.insertionLine ?? -1);
     if (state.stampSource !== undefined) setStampSource(!!state.stampSource);
   };
@@ -78,10 +89,30 @@ function App() {
       pendingSaveRef.current = null;
 
       setContent(data.content);
+      setContentVersion((v) => v + 1);
       if (data.workspace) setWorkspace(data.workspace);
       if (data.filePath) setActiveFilePath(data.filePath);
       if (data.insertionLine !== undefined) setInsertionLine(data.insertionLine);
       if (data.stampSource !== undefined) setStampSource(!!data.stampSource);
+    });
+
+    // A capture is about to write into the note. Save any keystrokes still
+    // waiting on the debounce first, so the drop above has nothing to throw
+    // away. Always answer, even if the save fails: main is holding the
+    // capture until it hears back.
+    const unsubFlushEditor = window.electronAPI.onFlushEditor?.(async (id) => {
+      try {
+        if (pendingSaveRef.current !== null) {
+          clearTimeout(saveTimerRef.current);
+          const pending = pendingSaveRef.current;
+          pendingSaveRef.current = null;
+          await window.electronAPI.saveFileContent(pending);
+        }
+      } catch (e) {
+        console.error('[Casrion] Could not save edits before a capture:', e);
+      } finally {
+        window.electronAPI.editorFlushed(id);
+      }
     });
 
     // Voice Memo Handlers
@@ -123,6 +154,15 @@ function App() {
           const recordedType = mediaRecorder.mimeType || 'audio/webm';
           const audioBlob = new Blob(chunks, { type: recordedType });
           const arrayBuffer = await audioBlob.arrayBuffer();
+          // The memo is written into the note, and the file-updated after it
+          // would have to drop edits still waiting on the save debounce
+          // (typing while recording is normal). Save them first; a failed
+          // save must never cost the recording, so it is only logged.
+          try {
+            await flushPendingSave();
+          } catch (e) {
+            console.error('[Casrion] Could not save edits before the voice memo:', e);
+          }
           window.electronAPI.saveAudio(arrayBuffer, recordedType, durationMs);
         };
 
@@ -195,6 +235,7 @@ function App() {
 
     return () => {
       unsubFileUpdated();
+      unsubFlushEditor?.();
       unsubStartRecording();
       unsubStopRecording();
       window.removeEventListener('keydown', onKeyDown);
@@ -262,9 +303,11 @@ function App() {
     const result = await window.electronAPI.createFile({ fileName, targetFolder });
     if (result && !result.error) {
       applyState(result);
-    } else if (result?.error) {
-      alert(result.error);
+      return true;
     }
+    if (result?.error) alert(result.error);
+    // The sidebar keeps the typed name on screen so it can be fixed
+    return false;
   };
 
   const handleSelectFile = async (filePath) => {
@@ -282,7 +325,13 @@ function App() {
   };
 
   const handleToggleEditMode = async () => {
-    if (isEditMode) await flushPendingSave();
+    if (isEditMode) {
+      await flushPendingSave();
+      // Editor saves can move the insertion point in the main process (the
+      // round trip reflows the note), so pick the state back up from disk
+      // rather than showing the reading view with a stale marker.
+      applyState(await window.electronAPI?.getInitialState?.());
+    }
     setIsEditMode(!isEditMode);
   };
 
@@ -316,7 +365,9 @@ function App() {
         <div className="header-left">
           <span className={`capture-dot ${activeFilePath ? 'on' : ''}`}></span>
           {activeFilePath ? (
-            <span className="capture-status">Capturing to <strong>{activeFilePath.split(/[/\\]/).pop()}</strong></span>
+            <span className={`capture-status ${isEditMode ? 'capture-status-editing' : ''}`}>
+              {isEditMode ? 'Edit mode on. Captures still go to ' : 'Capturing to '}<strong>{activeFilePath.split(/[/\\]/).pop()}</strong>
+            </span>
           ) : (
             <span className="capture-status">No note selected</span>
           )}
@@ -379,6 +430,7 @@ function App() {
           ) : isEditMode ? (
             <Editor
               content={content}
+              contentVersion={contentVersion}
               onContentChange={handleContentChange}
             />
           ) : (

@@ -28,6 +28,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Insertion point
   setInsertionLine: (line) => ipcRenderer.invoke('set-insertion-line', line),
 
+  // Edit mode on/off, so leaving the window can remind the user it is still on
+  setEditMode: (on) => ipcRenderer.invoke('set-edit-mode', on),
+  // Before a capture writes, main asks the editor to save keystrokes still
+  // waiting on the debounce; the renderer answers once they are on disk
+  onFlushEditor: (callback) => subscribe('flush-editor', callback),
+  editorFlushed: (id) => ipcRenderer.invoke('editor-flushed', id),
+
   // Legacy
   getNoteContent: () => ipcRenderer.invoke('get-note-content'),
 

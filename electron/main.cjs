@@ -38,6 +38,9 @@ let settings = {};
 let undoStack = []; // stores { filePath, content, insertionLine } snapshots
 let redoStack = []; // undone snapshots, cleared by any fresh change
 let isRecording = false;
+// The main window is showing the editor rather than the reading view (the
+// renderer reports it), so leaving the window can say so.
+let editModeOn = false;
 // The recorder itself lives in the renderer, so "recording" is only real once
 // that side says so. Until then the sticky "Recording..." toast is a promise
 // we have not kept, and a microphone that never opens must not leave it up.
@@ -305,6 +308,16 @@ function readFileContent(filePath) {
       // stamp or memo line and got flattened by the markdown round trip.
       content = content.replace(/^\\(?=[-*] )/gm, '');
 
+      // Heal screenshots and boards an older build saved as escaped text
+      // ("!\[Screenshot\](assets/1.png)"). In a folder whose path had a space
+      // in it the hydrated image link never parsed, so the editor treated it
+      // as plain text and escaped its brackets on the way back to disk. Only
+      // lines pointing into the note's own assets folder are touched.
+      content = content.replace(
+        /^!\\\[([^\]\n]*?)\\\]\((assets\/[^)\s]+)\)/gm,
+        (_m, alt, src) => `![${alt.replace(/\\(.)/g, '$1')}](${src.replace(/\\([_*])/g, '$1')})`
+      );
+
       // Heal LaTeX whose backslashes a capture build doubled ("\\frac"):
       // KaTeX reads "\\" as a line break, so a doubled command rendered as its
       // plain letters ("frac"). Only inside math spans, and only a doubled
@@ -492,6 +505,31 @@ function insertBlankLine(lineNum) {
   }
 }
 
+// The editor writes the whole note back through an HTML round trip, which
+// reflows it: soft-wrapped paragraphs become one line, extra blank lines go.
+// insertionLine is a line number into the text as it was, so left alone the
+// next capture lands on whatever line now sits at that number, glued onto an
+// unrelated paragraph. Follow the line to where it went, or fall back to the
+// end of the note, which is always a safe place to add things.
+function remapInsertionLine(oldText, newText, line) {
+  if (line < 0) return line;
+  const oldLines = oldText.split('\n');
+  if (line >= oldLines.length) return -1;
+  const newLines = newText.split('\n');
+  const same = (i) => i < newLines.length && newLines[i].trim() === oldLines[i].trim();
+  // Nothing moved at or just above the insertion point: keep it.
+  if (same(line) && (line === 0 || same(line - 1))) return line;
+  const target = oldLines[line].trim();
+  // A parked blank line (Ctrl+Shift+N) carries nothing to search for.
+  if (!target) return -1;
+  let nth = 0;
+  for (let i = 0; i < line; i++) if (oldLines[i].trim() === target) nth++;
+  for (let i = 0; i < newLines.length; i++) {
+    if (newLines[i].trim() === target && nth-- === 0) return i;
+  }
+  return -1;
+}
+
 // Single source of truth for everything the renderer needs to display.
 // Content is ALWAYS hydrated here — returning raw relative asset paths was
 // the reason screenshots disappeared after re-adding a moved folder.
@@ -633,12 +671,20 @@ function createWindow() {
       settings.trayNoticeShown = true;
       saveSettings();
       showOverlayNotification('Casrion is minimized to the system tray', 'text', 5000);
+    } else {
+      remindEditMode();
     }
   });
 
+  // Walking away from the window while it is still in edit mode is easy to do
+  // by accident, and once the window is gone nothing on screen says so. Captures
+  // still land in the note either way; this just tells the user that.
+  mainWindow.on('minimize', () => remindEditMode());
+
   // On macOS the window is really destroyed on close; drop the reference so
-  // the tray/dock handlers know to rebuild it on next open.
-  mainWindow.on('closed', () => { mainWindow = null; });
+  // the tray/dock handlers know to rebuild it on next open. A rebuilt window
+  // starts in the reading view, so edit mode goes with it.
+  mainWindow.on('closed', () => { mainWindow = null; editModeOn = false; });
 
   // Parked in the tray the renderer needs no frames or fast timers — let
   // Chromium throttle it to near-idle so a hidden Casrion costs as little
@@ -663,6 +709,11 @@ function createWindow() {
       mainWindow.webContents.reload();
     }
   });
+}
+
+function remindEditMode() {
+  if (!editModeOn || !activeFilePath || app.isQuiting) return;
+  showOverlayNotification(`Still in edit mode. Captures keep going into ${path.basename(activeFilePath)}`, 'text', 4000);
 }
 
 // Bring the main window forward from the tray/dock. On macOS the window may
@@ -2084,12 +2135,38 @@ function quitApp() {
 
 // ─── Shortcuts ─────────────────────────────────────────────
 
+// In edit mode the renderer holds the last keystrokes for up to 350ms before
+// saving them (a debounce). A capture written inside that gap reads the note
+// without them, and the renderer then has to throw them away, because saving
+// them afterwards would erase the capture. So before a queued capture touches
+// the note, ask the editor to save what it is holding and wait until it has.
+// Free outside edit mode, one IPC round trip inside it, and capped so a
+// wedged renderer can delay a capture by a second at most, never block it.
+const EDITOR_FLUSH_TIMEOUT = 1000;
+let editorFlushSeq = 0;
+const editorFlushWaiters = new Map();
+function flushEditorEdits() {
+  if (!editModeOn || !mainWindow || mainWindow.isDestroyed()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const id = ++editorFlushSeq;
+    const done = () => {
+      if (!editorFlushWaiters.delete(id)) return;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(done, EDITOR_FLUSH_TIMEOUT);
+    editorFlushWaiters.set(id, done);
+    try { mainWindow.webContents.send('flush-editor', id); } catch { done(); }
+  });
+}
+
 // Captures are async (source stamping awaits the title helper), so rapid
 // hotkey presses could interleave mid-file-write. Chain them so each capture
 // fully lands before the next starts.
 let captureChain = Promise.resolve();
 function enqueueCapture(fn) {
   captureChain = captureChain
+    .then(() => flushEditorEdits())
     .then(fn)
     .catch((e) => {
       // A capture that threw (folder unplugged, file locked, disk full) must
@@ -2202,11 +2279,28 @@ function registerShortcuts() {
   }
 }
 
-// Folder names can contain characters that break URL parsing (#, ?, %).
-// Encode just those so casrion:// URLs survive `new URL()` intact; the
-// protocol handler decodes with decodeURIComponent.
+// The note's folder goes into markdown image links, and a markdown link ends
+// at the first space. So a note in "New folder" or "My Notes" showed every
+// screenshot as its raw path instead of the picture, while the same note on a
+// space-free path worked. Percent-encode the path the way a URL expects
+// (spaces, non-ASCII, brackets), plus what encodeURI leaves alone that still
+// breaks here: # and ? cut the URL short, ( ) end the markdown link early, and
+// & can be read as an HTML entity. The protocol handler decodes with
+// decodeURIComponent, and the editor's save path encodes the same way, so the
+// round trip back to relative paths still matches.
 function encodeDirForUrl(dir) {
-  return dir.replace(/%/g, '%25').replace(/#/g, '%23').replace(/\?/g, '%3F');
+  let out;
+  try {
+    out = encodeURI(dir);
+  } catch {
+    // A lone surrogate in a folder name makes encodeURI throw. Fall back to
+    // the old minimal encoding plus spaces rather than failing the note.
+    out = dir.replace(/%/g, '%25').replace(/ /g, '%20');
+  }
+  return out
+    .replace(/#/g, '%23').replace(/\?/g, '%3F')
+    .replace(/\(/g, '%28').replace(/\)/g, '%29')
+    .replace(/&/g, '%26');
 }
 
 function hydrateContentForRenderer(content, filePath) {
@@ -2215,6 +2309,20 @@ function hydrateContentForRenderer(content, filePath) {
   let hydrated = content.split(`](assets/`).join(`](casrion://${dir}/assets/`);
   hydrated = hydrated.split(`src="assets/`).join(`src="casrion://${dir}/assets/`);
   return hydrated;
+}
+
+// marked.use() changes marked's global defaults, so calling it inside the
+// export handler stacked one more copy of the KaTeX extension onto the shared
+// instance with every export. A private instance, built once on the first
+// export, carries exactly one and leaves the global marked untouched.
+let exportMarked = null;
+function getExportMarked() {
+  if (!exportMarked) {
+    const { Marked } = require('marked');
+    const markedKatex = require('marked-katex-extension');
+    exportMarked = new Marked(markedKatex({ throwOnError: false, nonStandard: true, output: 'mathml' }));
+  }
+  return exportMarked;
 }
 
 // ─── IPC Handlers ──────────────────────────────────────────
@@ -2391,8 +2499,11 @@ function registerIPC() {
     
     content = content.replace(mdRegex, `](assets/`);
     content = content.replace(htmlRegex, `src="assets/`);
-    
+
+    // Only needed when captures are aimed at a specific line; see remapInsertionLine
+    const before = insertionLine >= 0 ? readFileContent(activeFilePath) : null;
     writeFileAtomic(activeFilePath, content);
+    if (before !== null) insertionLine = remapInsertionLine(before, content, insertionLine);
     console.log('[Casrion] File saved:', activeFilePath);
     return { success: true };
   });
@@ -2402,8 +2513,12 @@ function registerIPC() {
     if (!activeFilePath || !fs.existsSync(activeFilePath)) return { error: 'No active file' };
     
     try {
-      let content = fs.readFileSync(activeFilePath, 'utf-8');
-      
+      // Decoded the way the app reads notes for display, so a note Notepad
+      // saved as UTF-16 exports as text instead of NUL-split garbage. Unlike
+      // readFileContent this throws on a failed read, which the catch below
+      // reports, rather than quietly exporting an empty document.
+      let content = decodeNote(readNoteBytes(activeFilePath)).replace(/\r\n?/g, '\n');
+
       // Inline images
       const imageRegex = /!\[([^\]]*)\]\((assets\/[^)]+)\)/g;
       content = content.replace(imageRegex, (match, alt, uri) => {
@@ -2461,10 +2576,7 @@ function registerIPC() {
         return match;
       });
 
-      const { marked } = require('marked');
-      const markedKatex = require('marked-katex-extension');
-      marked.use(markedKatex({ throwOnError: false, nonStandard: true, output: 'mathml' }));
-      const htmlContent = marked(content);
+      const htmlContent = getExportMarked().parse(content);
       const title = path.basename(activeFilePath, '.md');
       const escapedTitle = title.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -2645,7 +2757,13 @@ ${inlinedAudio ? AUDIO_FIRST_TAP_SCRIPT : ''}
     const targetFolder = typeof payload === 'string' ? settings.workingFolders[0] : payload.targetFolder;
 
     if (!targetFolder) return { error: 'No folder selected' };
-    const safeName = fileName.replace(/[^a-zA-Z0-9_\-\.\s]/g, '').replace(/^\.+/, '').trim();
+    // Strip only what Windows and macOS actually forbid in a file name. The
+    // old ASCII-only whitelist turned "Física" into "Fsica" and refused a name
+    // written in Urdu or Arabic outright as invalid. Trailing dots and spaces
+    // go too (Windows drops them silently, so the path would no longer match),
+    // and a typed ".md" is not doubled up.
+    const safeName = String(fileName || '').replace(/[<>:"/\\|?*]|\p{Cc}/gu, '')
+      .replace(/^\.+/, '').replace(/\.md$/i, '').replace(/[.\s]+$/, '').trim();
     if (!safeName) return { error: 'Invalid file name' };
     // Windows reserves device names — creating "CON.md" fails or misbehaves
     if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(safeName)) {
@@ -2677,6 +2795,16 @@ ${inlinedAudio ? AUDIO_FIRST_TAP_SCRIPT : ''}
       return buildStatePayload();
     }
     return { error: 'File not found' };
+  });
+
+  ipcMain.handle('set-edit-mode', (_event, on) => {
+    editModeOn = !!on;
+  });
+
+  // The editor has saved what it was holding; see flushEditorEdits
+  ipcMain.handle('editor-flushed', (_event, id) => {
+    const done = editorFlushWaiters.get(id);
+    if (done) done();
   });
 
   ipcMain.handle('set-insertion-line', (_event, line) => {
@@ -2743,10 +2871,12 @@ if (!gotSingleInstanceLock) {
 }
 
 app.on('second-instance', () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show();
-    mainWindow.focus();
-  }
+  // showMainWindow restores a minimized window (show() alone leaves it on the
+  // taskbar, so a second launch looked like it did nothing) and rebuilds one
+  // that macOS really closed. Before ready the first launch is still building
+  // its window and will show it itself.
+  if (!app.isReady()) return;
+  showMainWindow();
 });
 
 const ASSET_MIME = {

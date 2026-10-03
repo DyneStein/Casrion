@@ -1,21 +1,53 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FolderOpen, FileText, X, Plus, Trash2 } from 'lucide-react';
 
 function Sidebar({ workspace = [], activeFilePath, onAddFolder, onRemoveFolder, onDeleteFolder, onDeleteFile, onCreateFile, onSelectFile }) {
   const [creatingInFolder, setCreatingInFolder] = useState(null);
   const [newFileName, setNewFileName] = useState('');
+  // A second Enter while the first create is still in flight would try to
+  // make the same note twice and pop a "File already exists" alert.
+  const creatingRef = useRef(false);
 
-  const handleCreate = (targetFolder) => {
-    if (newFileName.trim()) {
-      onCreateFile(newFileName.trim(), targetFolder);
+  const cancelCreate = () => {
+    setCreatingInFolder(null);
+    setNewFileName('');
+  };
+
+  // The + button toggles: a second click closes the name box again
+  const toggleCreate = (folderPath) => {
+    if (creatingInFolder === folderPath) {
+      cancelCreate();
+    } else {
+      setCreatingInFolder(folderPath);
       setNewFileName('');
-      setCreatingInFolder(null);
+    }
+  };
+
+  const handleCreate = async (targetFolder) => {
+    const name = newFileName.trim();
+    if (!name || creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      // Close only once the note exists. On an error (name taken, reserved)
+      // the typed name stays put so it can be fixed instead of retyped.
+      if (await onCreateFile(name, targetFolder)) cancelCreate();
+    } finally {
+      creatingRef.current = false;
     }
   };
 
   const handleKeyDown = (e, targetFolder) => {
     if (e.key === 'Enter') handleCreate(targetFolder);
-    if (e.key === 'Escape') { setCreatingInFolder(null); setNewFileName(''); }
+    if (e.key === 'Escape') cancelCreate();
+  };
+
+  // Clicking away from an empty name box means the user changed their mind.
+  // A typed name is kept: that click may be on the Create button itself. Focus
+  // moving to a + button is left to that button's own toggle, or the blur
+  // would close the box and the click would open it straight back up.
+  const handleBlur = (e) => {
+    if (e.relatedTarget?.closest?.('[data-create-toggle]')) return;
+    if (!newFileName.trim()) cancelCreate();
   };
 
   return (
@@ -40,7 +72,7 @@ function Sidebar({ workspace = [], activeFilePath, onAddFolder, onRemoveFolder, 
                   <FolderOpen size={15} strokeWidth={1.5} />
                   <span className="folder-name" style={{ fontWeight: 600 }}>{folderGroup.folderName}</span>
                 </button>
-                <button className="icon-btn" onClick={() => setCreatingInFolder(folderGroup.folderPath)} title="Create a new note inside this folder" style={{ padding: '0.3rem', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.7 }}>
+                <button className="icon-btn" data-create-toggle onClick={() => toggleCreate(folderGroup.folderPath)} title="Create a new note inside this folder" style={{ padding: '0.3rem', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.7 }}>
                   <Plus size={14} strokeWidth={1.5} />
                 </button>
                 <button className="icon-btn" onClick={() => onRemoveFolder(folderGroup.folderPath)} title="Remove this folder from the workspace. Your files stay on disk" style={{ padding: '0.3rem', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.7 }}>
@@ -61,9 +93,13 @@ function Sidebar({ workspace = [], activeFilePath, onAddFolder, onRemoveFolder, 
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, folderGroup.folderPath)}
+                    onBlur={handleBlur}
                     autoFocus
                   />
                   <button className="create-confirm-btn" onClick={() => handleCreate(folderGroup.folderPath)}>Create</button>
+                  <button className="create-cancel-btn" onClick={cancelCreate} title="Cancel. Shortcut: Escape">
+                    <X size={14} strokeWidth={1.5} />
+                  </button>
                 </div>
               )}
 

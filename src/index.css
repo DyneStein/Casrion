@@ -180,6 +180,8 @@ body.platform-mac .header {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .capture-status strong { color: var(--text-primary); font-weight: 600; }
+/* Edit mode is easy to forget about, so the header says it in the accent color */
+.capture-status-editing { color: var(--accent); }
 
 /* A small square "recording light" reads more like print than a round dot */
 .capture-dot {
@@ -344,6 +346,14 @@ body.platform-mac .header {
   transition: background 0.15s;
 }
 .create-confirm-btn:hover { background: var(--accent-hover); }
+.create-cancel-btn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 0.35rem;
+  background: transparent; border: 1px solid var(--border-light); border-radius: 3px;
+  color: var(--text-secondary); cursor: pointer;
+  transition: all 0.15s;
+}
+.create-cancel-btn:hover { border-color: var(--accent); color: var(--text-primary); }
 
 /* ─── Viewer (Document Mode) ─────────────────────────────── */
 .wysiwyg-wrapper {
@@ -636,6 +646,13 @@ body.platform-mac .header {
   background: var(--accent-soft-strong);
   border-color: var(--accent);
   color: var(--accent);
+}
+/* Font size buttons hold icons of three sizes in one fixed box (the same box
+   a 16px icon plus padding gives every other button), so the row stays even */
+.toolbar-btn-size {
+  width: calc(16px + 0.7rem + 2px);
+  height: calc(16px + 0.7rem + 2px);
+  padding: 0;
 }
 .toolbar-divider { width: 1px; height: 16px; background: var(--border-light); margin: 0 0.25rem; }
 
